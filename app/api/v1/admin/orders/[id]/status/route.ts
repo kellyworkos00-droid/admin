@@ -2,8 +2,13 @@ import { prisma } from "@/lib/prisma";
 import { isAdminRequest } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
 import { serializeOrder } from "@/lib/serializers";
+import type { OrderStatus } from "@prisma/client";
 
-const validStatuses = new Set(["PENDING", "CONFIRMED", "PACKING", "SHIPPED", "DELIVERED", "CANCELLED"]);
+const validStatuses: OrderStatus[] = ["PENDING", "CONFIRMED", "PACKING", "SHIPPED", "DELIVERED", "CANCELLED"];
+
+function isOrderStatus(value: string): value is OrderStatus {
+  return validStatuses.includes(value as OrderStatus);
+}
 
 type RouteContext = {
   params: {
@@ -18,7 +23,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
   const body = await request.json().catch(() => null);
   const status = body?.status;
-  if (typeof status !== "string" || !validStatuses.has(status)) {
+  if (typeof status !== "string" || !isOrderStatus(status)) {
     return jsonError("Invalid status payload", 422);
   }
 
