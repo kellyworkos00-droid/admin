@@ -2,12 +2,13 @@ import { prisma } from "@/lib/prisma";
 import { isAdminRequest } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
 import { serializeOrder } from "@/lib/serializers";
-import type { OrderStatus } from "@prisma/client";
 
-const validStatuses: OrderStatus[] = ["PENDING", "CONFIRMED", "PACKING", "SHIPPED", "DELIVERED", "CANCELLED"];
+type OrderStatusValue = "PENDING" | "CONFIRMED" | "PACKING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 
-function isOrderStatus(value: string): value is OrderStatus {
-  return validStatuses.includes(value as OrderStatus);
+const validStatuses: OrderStatusValue[] = ["PENDING", "CONFIRMED", "PACKING", "SHIPPED", "DELIVERED", "CANCELLED"];
+
+function isOrderStatus(value: string): value is OrderStatusValue {
+  return validStatuses.includes(value as OrderStatusValue);
 }
 
 type RouteContext = {
