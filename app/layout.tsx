@@ -2,13 +2,19 @@ import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "Eterna Admin",
   description: "Admin dashboard for products and orders",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const [lowStockCount, newOrdersCount] = await Promise.all([
+    prisma.product.count({ where: { isActive: true, stockQty: { lte: 10 } } }),
+    prisma.order.count({ where: { status: "PENDING" } }),
+  ]);
+
   return (
     <html lang="en">
       <body className="admin-shell">
@@ -35,6 +41,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/admin/orders" className="admin-nav-link">
                 Orders
               </Link>
+              <Link href="/admin/slider" className="admin-nav-link">
+                Slider Manager
+              </Link>
             </nav>
 
             <div className="mt-6 rounded-2xl border border-rose-100 bg-rose-50/70 p-4 text-xs text-rose-800">
@@ -46,7 +55,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <header className="sticky top-0 z-20 border-b border-gray-200/70 bg-white/85 px-4 py-3 backdrop-blur">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-gray-700">Eterna Operations Workspace</p>
-                <div className="rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800">Admin</div>
+                <div className="flex items-center gap-2">
+                  <div className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">Low stock: {lowStockCount}</div>
+                  <div className="rounded-full bg-sky-100 px-3 py-1 text-xs font-bold text-sky-800">New orders: {newOrdersCount}</div>
+                  <div className="rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-800">Admin</div>
+                </div>
               </div>
             </header>
 
