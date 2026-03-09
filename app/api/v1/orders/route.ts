@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { jsonError, jsonNoContent, jsonOk } from "@/lib/api";
+import { calculatePromoDiscount, consumePromo, getValidPromoByCode } from "@/lib/promos";
 import { serializeOrder } from "@/lib/serializers";
 
 type OrderPayload = {
@@ -10,6 +11,7 @@ type OrderPayload = {
   city: string;
   notes?: string;
   paymentMethod: "CARD" | "MPESA" | "BANK" | "COD";
+  promoCode?: string;
   items: Array<{ productId: string; quantity: number }>;
 };
 
@@ -70,8 +72,37 @@ export async function POST(request: Request) {
     return sum + Number(product.bulkPrice) * item.quantity;
   }, 0);
 
+  let promoId: string | null = null;
+  let promoCodeUsed: string | null = null;
+  let discountAmount = 0;
+
+  if (payload.promoCode && payload.promoCode.trim()) {
+    const promo = await getValidPromoByCode(payload.promoCode);
+    if (!promo) {
+      return jsonError("Invalid or expired promo code", 422);
+    }
+
+    const pricedItems = payload.items.map((item) => {
+      const product = products.find((entry: { id: string; category: string; bulkPrice: unknown }) => entry.id === item.productId)!;
+      return {
+        productId: product.id,
+        category: product.category,
+        lineTotal: Number(product.bulkPrice) * item.quantity,
+      };
+    });
+
+    discountAmount = calculatePromoDiscount({
+      promo,
+      items: pricedItems,
+      subtotal,
+    });
+
+    promoId = promo.id;
+    promoCodeUsed = promo.code;
+  }
+
   const shippingFee = 750;
-  const total = subtotal + shippingFee;
+  const total = Math.max(0, subtotal - discountAmount) + shippingFee;
   const orderNumber = `ETR-${Date.now()}`;
 
   const order = await prisma.order.create({
@@ -82,12 +113,15 @@ export async function POST(request: Request) {
       customerEmail: payload.customerEmail,
       addressLine1: payload.addressLine1,
       city: payload.city,
-      notes: payload.notes,
       paymentMethod: payload.paymentMethod,
       paymentStatus: payload.paymentMethod === "COD" ? "PENDING" : "PENDING",
       subtotal,
       shippingFee,
       total,
+      notes:
+        promoCodeUsed && discountAmount > 0
+          ? `${payload.notes ? `${payload.notes} | ` : ""}Promo ${promoCodeUsed} applied (KES ${discountAmount.toFixed(2)})`
+          : payload.notes,
       items: {
         create: payload.items.map((item) => {
           const product = products.find((entry: { id: string; bulkPrice: unknown }) => entry.id === item.productId)!;
@@ -103,6 +137,10 @@ export async function POST(request: Request) {
     },
     include: { items: true },
   });
+
+  if (promoId && discountAmount > 0) {
+    await consumePromo(promoId);
+  }
 
   return jsonOk(serializeOrder(order), 201);
 }
