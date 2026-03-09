@@ -2,14 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap");
+
 :root {
-  --bg: #ffffff;
-  --fg: #111827;
+  --bg: #f8f9fb;
+  --fg: #101828;
+  --panel: #ffffff;
+  --panel-border: #e7e9ee;
+  --brand-red: #c2182f;
+  --brand-red-dark: #9f1026;
+  --brand-red-soft: #ffe6ea;
 }
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: "Segoe UI", sans-serif;
+  font-family: "DM Sans", "Segoe UI", sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Space Grotesk", "DM Sans", sans-serif;
+}
+
+.admin-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(194, 24, 47, 0.08), transparent 24%),
+    radial-gradient(circle at 95% 10%, rgba(255, 99, 71, 0.12), transparent 20%),
+    linear-gradient(180deg, #fcfcfd 0%, #f6f7fa 100%);
+}
+
+.admin-nav-link {
+  @apply flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-gray-600 transition;
+}
+
+.admin-nav-link:hover {
+  @apply bg-rose-50 text-rose-700;
+}
+
+.admin-nav-link.active {
+  @apply bg-rose-100 text-rose-800;
+}
+
+.admin-card {
+  @apply rounded-2xl border bg-white p-5 shadow-sm;
+  border-color: var(--panel-border);
+}
+
+.admin-table {
+  @apply w-full border-collapse text-sm;
+}
+
+.admin-table th {
+  @apply border-b border-gray-200 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500;
+}
+
+.admin-table td {
+  @apply border-b border-gray-100 px-3 py-3 text-gray-700;
 }
