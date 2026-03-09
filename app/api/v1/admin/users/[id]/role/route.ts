@@ -4,6 +4,7 @@ import { jsonError, jsonOk } from "@/lib/api";
 import { serializeUser } from "@/lib/serializers";
 
 const validRoles = new Set(["ADMIN", "STAFF", "CUSTOMER"]);
+type ValidRole = "ADMIN" | "STAFF" | "CUSTOMER";
 
 type RouteContext = {
   params: {
@@ -22,9 +23,11 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     return jsonError("Invalid role payload", 422);
   }
 
+  const nextRole = role as ValidRole;
+
   const user = await prisma.user.update({
     where: { id: params.id },
-    data: { role },
+    data: { role: nextRole },
   });
 
   return jsonOk(serializeUser(user));
