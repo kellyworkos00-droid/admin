@@ -1,8 +1,55 @@
-export default function AdminDashboardPage() {
+import { prisma } from "@/lib/prisma";
+
+function formatKes(value: number) {
+  return new Intl.NumberFormat("en-KE", {
+    style: "currency",
+    currency: "KES",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+export default async function AdminDashboardPage() {
+  const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const [todayOrdersCount, todayRevenueAgg, lowStockCount, pendingOrdersCount, topProductGroups] = await Promise.all([
+    prisma.order.count({ where: { createdAt: { gte: startOfToday } } }),
+    prisma.order.aggregate({
+      where: { createdAt: { gte: startOfToday }, status: { not: "CANCELLED" } },
+      _sum: { total: true },
+    }),
+    prisma.product.count({ where: { isActive: true, stockQty: { lte: 10 } } }),
+    prisma.order.count({ where: { status: "PENDING" } }),
+    prisma.orderItem.groupBy({
+      by: ["productId"],
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: "desc" } },
+      take: 3,
+    }),
+  ]);
+
+  const topProductIds = topProductGroups.map((entry) => entry.productId);
+  const topProducts = topProductIds.length
+    ? await prisma.product.findMany({ where: { id: { in: topProductIds } }, select: { id: true, name: true } })
+    : [];
+
+  const topProductNameById = new Map(topProducts.map((product) => [product.id, product.name]));
+  const topSellingProducts = topProductGroups
+    .map((entry) => ({
+      productId: entry.productId,
+      name: topProductNameById.get(entry.productId) ?? "Unknown product",
+      quantity: entry._sum.quantity ?? 0,
+    }))
+    .filter((item) => item.quantity > 0);
+
+  const todayRevenue = Number(todayRevenueAgg._sum.total ?? 0);
+
   const metrics = [
-    { label: "Today Revenue", value: "$2,480", delta: "+12.4%", tone: "text-emerald-600" },
-    { label: "Open Orders", value: "18", delta: "+3", tone: "text-amber-600" },
-    { label: "Products Live", value: "124", delta: "+6", tone: "text-sky-600" },
+    { label: "Today Orders", value: String(todayOrdersCount), tone: "text-sky-700" },
+    { label: "Revenue Today", value: formatKes(todayRevenue), tone: "text-emerald-700" },
+    { label: "Low Stock Items", value: String(lowStockCount), tone: "text-amber-700" },
+    { label: "Pending Orders", value: String(pendingOrdersCount), tone: "text-rose-700" },
   ];
 
   return (
@@ -10,67 +57,33 @@ export default function AdminDashboardPage() {
       <section className="admin-card">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-600">Overview</p>
         <h2 className="mt-2 text-2xl font-bold text-gray-900">Operations Dashboard</h2>
-        <p className="mt-1 text-sm text-gray-600">Track sales momentum, fulfillment, and product activity from one place.</p>
+        <p className="mt-1 text-sm text-gray-600">Business health snapshot with live performance indicators.</p>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {metrics.map((item) => (
-          <div key={item.label} className="admin-card">
+          <article key={item.label} className="admin-card">
             <p className="text-sm text-gray-500">{item.label}</p>
             <p className="mt-2 text-3xl font-bold text-gray-900">{item.value}</p>
-            <p className={`mt-2 text-sm font-semibold ${item.tone}`}>{item.delta} vs yesterday</p>
-          </div>
+            <p className={`mt-2 text-xs font-semibold ${item.tone}`}>Live</p>
+          </article>
         ))}
-      </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <div className="admin-card">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-900">Fulfillment Progress</h3>
-            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">Healthy</span>
-          </div>
-
-          <div className="mt-4 space-y-4">
-            <div>
-              <div className="mb-1 flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-700">Packed Orders</span>
-                <span className="font-semibold text-gray-900">72%</span>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100">
-                <div className="h-2 w-[72%] rounded-full bg-gradient-to-r from-rose-500 to-red-600" />
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-1 flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-700">Shipped Orders</span>
-                <span className="font-semibold text-gray-900">54%</span>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100">
-                <div className="h-2 w-[54%] rounded-full bg-gradient-to-r from-orange-400 to-rose-500" />
-              </div>
-            </div>
-
-            <div>
-              <div className="mb-1 flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-700">Delivered Orders</span>
-                <span className="font-semibold text-gray-900">39%</span>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100">
-                <div className="h-2 w-[39%] rounded-full bg-gradient-to-r from-sky-400 to-cyan-500" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="admin-card">
-          <h3 className="text-lg font-bold text-gray-900">Recent Activity</h3>
-          <ul className="mt-4 space-y-3 text-sm">
-            <li className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-gray-700">Order <span className="font-semibold">#1052</span> marked as shipped.</li>
-            <li className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-gray-700">Added product <span className="font-semibold">Classic Leather Bag</span>.</li>
-            <li className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-gray-700">Inventory alert for <span className="font-semibold">Silk Wrap Dress</span>.</li>
-          </ul>
-        </div>
+        <article className="admin-card sm:col-span-2 xl:col-span-1">
+          <p className="text-sm text-gray-500">Top-Selling Products</p>
+          {topSellingProducts.length === 0 ? (
+            <p className="mt-3 text-sm font-semibold text-gray-700">No sales yet</p>
+          ) : (
+            <ul className="mt-3 space-y-2 text-sm">
+              {topSellingProducts.map((item) => (
+                <li key={item.productId} className="flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-2.5 py-2 text-gray-700">
+                  <span className="line-clamp-1 font-medium">{item.name}</span>
+                  <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700">{item.quantity}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
       </section>
     </main>
   );
