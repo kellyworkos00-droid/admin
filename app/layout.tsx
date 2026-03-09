@@ -44,6 +44,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/admin/slider" className="admin-nav-link">
                 Slider Manager
               </Link>
+              <Link href="/admin/analytics" className="admin-nav-link">
+                Analytics
+              </Link>
+              <Link href="/admin/customers" className="admin-nav-link">
+                Customers
+              </Link>
+              <Link href="/admin/promos" className="admin-nav-link">
+                Promos
+              </Link>
             </nav>
 
             <div className="mt-6 rounded-2xl border border-rose-100 bg-rose-50/70 p-4 text-xs text-rose-800">
