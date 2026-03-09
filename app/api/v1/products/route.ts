@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { jsonOk, parsePageParams } from "@/lib/api";
+import { jsonNoContent, jsonOk, parsePageParams } from "@/lib/api";
 import { serializeProduct } from "@/lib/serializers";
+
+export function OPTIONS() {
+  return jsonNoContent();
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

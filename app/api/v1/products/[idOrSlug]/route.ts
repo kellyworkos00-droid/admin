@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { jsonError, jsonOk } from "@/lib/api";
+import { jsonError, jsonNoContent, jsonOk } from "@/lib/api";
 import { serializeProduct } from "@/lib/serializers";
 
 type RouteContext = {
@@ -23,4 +23,8 @@ export async function GET(_request: Request, { params }: RouteContext) {
   }
 
   return jsonOk(serializeProduct(product));
+}
+
+export function OPTIONS() {
+  return jsonNoContent();
 }

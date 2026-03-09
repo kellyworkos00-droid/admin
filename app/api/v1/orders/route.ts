@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { jsonError, jsonOk } from "@/lib/api";
+import { jsonError, jsonNoContent, jsonOk } from "@/lib/api";
 import { serializeOrder } from "@/lib/serializers";
 
 type OrderPayload = {
@@ -43,6 +43,10 @@ function isValidOrderPayload(value: unknown): value is OrderPayload {
         item.quantity > 0
     )
   );
+}
+
+export function OPTIONS() {
+  return jsonNoContent();
 }
 
 export async function POST(request: Request) {
