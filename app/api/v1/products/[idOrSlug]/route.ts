@@ -2,6 +2,9 @@ import { prisma } from "@/lib/prisma";
 import { jsonError, jsonNoContent, jsonOk } from "@/lib/api";
 import { serializeProduct } from "@/lib/serializers";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type RouteContext = {
   params: {
     idOrSlug: string;
