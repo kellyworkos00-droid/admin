@@ -53,6 +53,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/admin/promos" className="admin-nav-link">
                 Promos
               </Link>
+              <Link href="/admin/content" className="admin-nav-link">
+                Content
+              </Link>
             </nav>
 
             <div className="mt-6 rounded-2xl border border-rose-100 bg-rose-50/70 p-4 text-xs text-rose-800">
