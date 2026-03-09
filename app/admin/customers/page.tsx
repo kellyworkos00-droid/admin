@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCustomerProfiles, setCustomerVip } from "@/lib/customers";
+import { logAuditEvent } from "@/lib/audit";
 
 function formatKes(value: number) {
   return new Intl.NumberFormat("en-KE", {
@@ -27,6 +28,16 @@ async function toggleVip(formData: FormData) {
     displayName: displayName || undefined,
     phone: phone || undefined,
     email: email || undefined,
+  });
+
+  await logAuditEvent({
+    action: "CUSTOMER_VIP_TOGGLED",
+    entityType: "customer",
+    entityId: customerKey,
+    actor: "admin-ui",
+    actorRole: "ADMIN",
+    channel: "admin_ui",
+    metadata: { displayName, phone, email, isVip: nextVip },
   });
 
   revalidatePath("/admin/customers");

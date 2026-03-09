@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { listHomeSlides, saveHomeSlides, type HomeSlide } from "@/lib/content";
+import { logAuditEvent } from "@/lib/audit";
 
 async function saveContent(formData: FormData) {
   "use server";
@@ -32,6 +33,17 @@ async function saveContent(formData: FormData) {
   }));
 
   await saveHomeSlides(slides);
+  await logAuditEvent({
+    action: "CONTENT_SAVED",
+    entityType: "home_slide",
+    actor: "admin-ui",
+    actorRole: "ADMIN",
+    channel: "admin_ui",
+    metadata: {
+      totalSlides: slides.length,
+      activeSlides: slides.filter((slide) => slide.isActive).length,
+    },
+  });
   revalidatePath("/admin/content");
   revalidatePath("/");
 }

@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import { isAdminRequest } from "@/lib/auth";
+import { getAdminApiIdentity, hasAdminPermission, isAdminRequest } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
 import { serializeProduct } from "@/lib/serializers";
+import { logAuditEvent } from "@/lib/audit";
 
 type CreateProductPayload = {
   sku: string;
@@ -63,6 +64,11 @@ export async function POST(request: Request) {
     return jsonError("Unauthorized", 401);
   }
 
+  const identity = getAdminApiIdentity(request);
+  if (!hasAdminPermission(identity.role, "catalog:write")) {
+    return jsonError("Forbidden", 403);
+  }
+
   const body = await request.json().catch(() => null);
   if (!isValidCreateProductPayload(body)) {
     return jsonError("Invalid product payload", 422);
@@ -76,5 +82,16 @@ export async function POST(request: Request) {
       discountPct: body.discountPct ?? 0,
     },
   });
+
+  await logAuditEvent({
+    action: "PRODUCT_CREATED",
+    entityType: "product",
+    entityId: created.id,
+    actor: identity.actor,
+    actorRole: identity.role,
+    channel: "admin_api",
+    metadata: { sku: created.sku, name: created.name, category: created.category },
+  });
+
   return jsonOk(serializeProduct(created), 201);
 }

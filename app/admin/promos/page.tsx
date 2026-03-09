@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { createPromo, listPromos, setPromoActive } from "@/lib/promos";
+import { logAuditEvent } from "@/lib/audit";
 
 async function addPromo(formData: FormData) {
   "use server";
@@ -31,6 +32,15 @@ async function addPromo(formData: FormData) {
     isActive,
   });
 
+  await logAuditEvent({
+    action: "PROMO_CREATED",
+    entityType: "promo",
+    actor: "admin-ui",
+    actorRole: "ADMIN",
+    channel: "admin_ui",
+    metadata: { code, discountType, discountValue, appliesToType, appliesToValue, isActive },
+  });
+
   revalidatePath("/admin/promos");
 }
 
@@ -44,6 +54,15 @@ async function togglePromo(formData: FormData) {
   }
 
   await setPromoActive(id, nextActive);
+  await logAuditEvent({
+    action: "PROMO_TOGGLED",
+    entityType: "promo",
+    entityId: id,
+    actor: "admin-ui",
+    actorRole: "ADMIN",
+    channel: "admin_ui",
+    metadata: { isActive: nextActive },
+  });
   revalidatePath("/admin/promos");
 }
 

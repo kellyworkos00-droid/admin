@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { logAuditEvent } from "@/lib/audit";
 
 type OrdersPageProps = {
   searchParams?: {
@@ -28,7 +29,21 @@ async function updateOrderStatus(formData: FormData) {
     return;
   }
 
+  const current = await prisma.order.findUnique({ where: { id }, select: { status: true, orderNumber: true } });
   await prisma.order.update({ where: { id }, data: { status } });
+  await logAuditEvent({
+    action: "ORDER_STATUS_UPDATED",
+    entityType: "order",
+    entityId: id,
+    actor: "admin-ui",
+    actorRole: "ADMIN",
+    channel: "admin_ui",
+    metadata: {
+      orderNumber: current?.orderNumber ?? null,
+      previousStatus: current?.status ?? null,
+      nextStatus: status,
+    },
+  });
   revalidatePath("/admin/orders");
   revalidatePath("/admin");
 }

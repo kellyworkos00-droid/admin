@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { getSliderManagerRows, saveSliderConfig } from "@/lib/slider";
+import { logAuditEvent } from "@/lib/audit";
 import SliderManagerClient from "./SliderManagerClient";
 
 async function saveSliderItems(formData: FormData) {
@@ -19,6 +20,17 @@ async function saveSliderItems(formData: FormData) {
   }>;
 
   await saveSliderConfig(parsed);
+  await logAuditEvent({
+    action: "SLIDER_CONFIG_SAVED",
+    entityType: "slider",
+    actor: "admin-ui",
+    actorRole: "ADMIN",
+    channel: "admin_ui",
+    metadata: {
+      totalItems: parsed.length,
+      featuredItems: parsed.filter((item) => item.isFeatured).length,
+    },
+  });
 
   revalidatePath("/admin/slider");
 }

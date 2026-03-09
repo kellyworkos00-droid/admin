@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
+import { logAuditEvent } from "@/lib/audit";
 
 const FALLBACK_IMAGE_URL = "https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=1200&q=80";
 
@@ -110,7 +111,7 @@ async function createProduct(formData: FormData) {
     }
   }
 
-  await prisma.product.create({
+  const created = await prisma.product.create({
     data: {
       sku,
       name,
@@ -125,6 +126,16 @@ async function createProduct(formData: FormData) {
       discountPct: Math.max(0, toInt(formData.get("discountPct"), 0)),
       isActive: true,
     },
+  });
+
+  await logAuditEvent({
+    action: "PRODUCT_CREATED",
+    entityType: "product",
+    entityId: created.id,
+    actor: "admin-ui",
+    actorRole: "ADMIN",
+    channel: "admin_ui",
+    metadata: { sku: created.sku, name: created.name, category: created.category },
   });
 
   revalidatePath("/admin/products");
@@ -150,7 +161,7 @@ async function updateProduct(formData: FormData) {
     }
   }
 
-  await prisma.product.update({
+  const updated = await prisma.product.update({
     where: { id },
     data: {
       sku: getText(formData.get("sku")),
@@ -166,6 +177,16 @@ async function updateProduct(formData: FormData) {
       discountPct: Math.max(0, toInt(formData.get("discountPct"), 0)),
       isActive: getText(formData.get("isActive")) === "on",
     },
+  });
+
+  await logAuditEvent({
+    action: "PRODUCT_UPDATED",
+    entityType: "product",
+    entityId: updated.id,
+    actor: "admin-ui",
+    actorRole: "ADMIN",
+    channel: "admin_ui",
+    metadata: { sku: updated.sku, name: updated.name, category: updated.category },
   });
 
   revalidatePath("/admin/products");
@@ -187,6 +208,8 @@ async function importProducts(formData: FormData) {
 
   const sheet = workbook.Sheets[firstSheetName];
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+
+  let importedCount = 0;
 
   for (const row of rows) {
     const sku = readCell(row, ["sku", "SKU", "Sku"]);
@@ -237,7 +260,18 @@ async function importProducts(formData: FormData) {
         discountPct,
       },
     });
+
+    importedCount += 1;
   }
+
+  await logAuditEvent({
+    action: "PRODUCTS_IMPORTED",
+    entityType: "product",
+    actor: "admin-ui",
+    actorRole: "ADMIN",
+    channel: "admin_ui",
+    metadata: { importedCount, fileName: file.name },
+  });
 
   revalidatePath("/admin/products");
 }
