@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
 import { logAuditEvent } from "@/lib/audit";
+import { sendAdminAlert } from "@/lib/alerts";
 
 const FALLBACK_IMAGE_URL = "https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=1200&q=80";
 
@@ -271,6 +272,14 @@ async function importProducts(formData: FormData) {
     actorRole: "ADMIN",
     channel: "admin_ui",
     metadata: { importedCount, fileName: file.name },
+  });
+
+  await sendAdminAlert({
+    title: "Products imported from spreadsheet",
+    severity: "warning",
+    actor: "admin-ui",
+    source: "admin_ui",
+    details: { importedCount, fileName: file.name },
   });
 
   revalidatePath("/admin/products");

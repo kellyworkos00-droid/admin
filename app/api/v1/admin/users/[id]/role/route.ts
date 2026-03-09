@@ -3,6 +3,7 @@ import { getAdminApiIdentity, hasAdminPermission, isAdminRequest } from "@/lib/a
 import { jsonError, jsonOk } from "@/lib/api";
 import { serializeUser } from "@/lib/serializers";
 import { logAuditEvent } from "@/lib/audit";
+import { sendAdminAlert } from "@/lib/alerts";
 
 const validRoles = new Set(["ADMIN", "STAFF", "CUSTOMER"]);
 type ValidRole = "ADMIN" | "STAFF" | "CUSTOMER";
@@ -46,6 +47,19 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     actorRole: identity.role,
     channel: "admin_api",
     metadata: {
+      email: before?.email ?? user.email,
+      previousRole: before?.role ?? null,
+      nextRole,
+    },
+  });
+
+  await sendAdminAlert({
+    title: "User role updated",
+    severity: "critical",
+    actor: identity.actor,
+    source: "admin_api",
+    details: {
+      userId: user.id,
       email: before?.email ?? user.email,
       previousRole: before?.role ?? null,
       nextRole,

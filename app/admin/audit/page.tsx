@@ -19,6 +19,7 @@ function tryFormatMetadata(raw: string) {
 export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
   const action = searchParams?.action?.trim() || undefined;
   const entityType = searchParams?.entity?.trim() || undefined;
+  const alertsEnabled = Boolean(process.env.ADMIN_ALERT_WEBHOOK_URL?.trim());
 
   const events = await listAuditEvents({
     action,
@@ -31,6 +32,10 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
       <section className="admin-card">
         <h2 className="text-2xl font-bold text-gray-900">Audit Logs</h2>
         <p className="mt-1 text-sm text-gray-600">Track all sensitive admin changes for products, orders, promos, content, and users.</p>
+        <p className="mt-2 text-xs font-semibold text-gray-600">
+          Alerts: {alertsEnabled ? "Enabled" : "Disabled"}
+          {!alertsEnabled ? " (set ADMIN_ALERT_WEBHOOK_URL to enable notifications)" : ""}
+        </p>
       </section>
 
       <section className="admin-card">
