@@ -9,13 +9,28 @@ type CreateProductPayload = {
   slug: string;
   description?: string;
   category: string;
-  imageUrl: string;
+  imageUrl?: string;
   price: number;
   bulkPrice: number;
   minOrder: number;
   stockQty?: number;
   discountPct?: number;
 };
+
+const FALLBACK_IMAGE_URL = "https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=1200&q=80";
+
+function isValidImageUrl(value: string | undefined): boolean {
+  if (value === undefined) {
+    return true;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return true;
+  }
+
+  return trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("data:image/");
+}
 
 function isValidCreateProductPayload(value: unknown): value is CreateProductPayload {
   if (!value || typeof value !== "object") {
@@ -32,8 +47,7 @@ function isValidCreateProductPayload(value: unknown): value is CreateProductPayl
     payload.slug.length >= 2 &&
     typeof payload.category === "string" &&
     payload.category.length >= 2 &&
-    typeof payload.imageUrl === "string" &&
-    payload.imageUrl.startsWith("http") &&
+    isValidImageUrl(payload.imageUrl) &&
     typeof payload.price === "number" &&
     payload.price > 0 &&
     typeof payload.bulkPrice === "number" &&
@@ -57,6 +71,7 @@ export async function POST(request: Request) {
   const created = await prisma.product.create({
     data: {
       ...body,
+      imageUrl: body.imageUrl?.trim() || FALLBACK_IMAGE_URL,
       stockQty: body.stockQty ?? 0,
       discountPct: body.discountPct ?? 0,
     },
