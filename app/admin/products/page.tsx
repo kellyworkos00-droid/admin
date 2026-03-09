@@ -280,6 +280,9 @@ export default async function AdminProductsPage() {
         <p className="mt-1 text-xs text-gray-600">
           Upload `.xlsx`, `.xls`, or `.csv` with columns like: `sku`, `name`, `category`, `price`, `bulkPrice`, `minOrder`, `stockQty`, `discountPct`, `imageUrl`.
         </p>
+        <p className="mt-1 text-xs text-gray-600">
+          Homepage sliding offers auto-refresh from product data. Update `discountPct` and product image to control what appears in the slider.
+        </p>
         <a
           href="/api/v1/admin/products/template"
           className="mt-3 inline-flex rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
