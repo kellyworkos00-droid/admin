@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 
 export const metadata: Metadata = {
   title: "Eterna Admin",
@@ -14,7 +15,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="mx-auto grid min-h-screen max-w-[1400px] grid-cols-1 lg:grid-cols-[260px_1fr]">
           <aside className="border-r border-gray-200/80 bg-white/90 px-4 py-5 backdrop-blur lg:sticky lg:top-0 lg:h-screen">
             <div className="rounded-2xl bg-gradient-to-r from-rose-700 to-red-600 p-4 text-white shadow-lg">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-100">Eterna</p>
+              <div className="flex items-center gap-3">
+                <div className="relative h-10 w-10 overflow-hidden rounded-lg bg-white/95 p-1 shadow-sm">
+                  <Image src="/logo.png" alt="Eterna logo" fill sizes="40px" className="object-contain" priority />
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-100">Eterna</p>
+              </div>
               <h1 className="mt-1 text-xl font-bold">Admin Panel</h1>
               <p className="mt-2 text-xs text-rose-100">Manage products, orders, and business operations.</p>
             </div>
