@@ -12,8 +12,77 @@ type OrderPayload = {
   notes?: string;
   paymentMethod: "CARD" | "MPESA" | "BANK" | "COD";
   promoCode?: string;
-  items: Array<{ productId: string; quantity: number }>;
+  items: Array<{ productId: string; quantity: number; selectedSize?: string }>;
 };
+
+const SIZES_MARKER = "[sizes]";
+const SIZE_PRICES_MARKER = "[size_prices]";
+
+function extractMarkerPayload(source: string, marker: string) {
+  const markerIndex = source.indexOf(marker);
+  if (markerIndex === -1) {
+    return "";
+  }
+
+  const afterMarker = source.slice(markerIndex + marker.length);
+  const nextIndexes = [SIZES_MARKER, SIZE_PRICES_MARKER]
+    .map((candidate) => afterMarker.indexOf(candidate))
+    .filter((index) => index >= 0);
+
+  const endIndex = nextIndexes.length > 0 ? Math.min(...nextIndexes) : afterMarker.length;
+  return afterMarker.slice(0, endIndex).trim();
+}
+
+function parseSizePrices(description: string | null | undefined) {
+  const descriptionRaw = (description ?? "").trim();
+  const markerIndex = descriptionRaw.indexOf(SIZE_PRICES_MARKER);
+  if (markerIndex === -1) {
+    return {} as Record<string, number>;
+  }
+
+  const metadataSection = descriptionRaw.slice(markerIndex);
+  const payload = extractMarkerPayload(metadataSection, SIZE_PRICES_MARKER);
+  const map: Record<string, number> = {};
+
+  const entries = payload
+    .split(/[|,]/g)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  for (const entry of entries) {
+    const [sizeRaw, priceRaw] = entry.split(":");
+    const size = String(sizeRaw ?? "").trim();
+    const price = Number(String(priceRaw ?? "").trim());
+    if (!size || !Number.isFinite(price) || price <= 0) {
+      continue;
+    }
+    map[size] = price;
+  }
+
+  return map;
+}
+
+function resolveUnitPrice(product: { bulkPrice: unknown; description: string | null }, selectedSize?: string) {
+  const defaultPrice = Number(product.bulkPrice);
+  if (!selectedSize) {
+    return defaultPrice;
+  }
+
+  const sizePrices = parseSizePrices(product.description);
+  const directMatch = sizePrices[selectedSize];
+  if (Number.isFinite(directMatch) && directMatch > 0) {
+    return directMatch;
+  }
+
+  const normalizedSelected = selectedSize.toLowerCase();
+  for (const [size, price] of Object.entries(sizePrices)) {
+    if (size.toLowerCase() === normalizedSelected) {
+      return price;
+    }
+  }
+
+  return defaultPrice;
+}
 
 function isValidOrderPayload(value: unknown): value is OrderPayload {
   if (!value || typeof value !== "object") {
@@ -42,7 +111,8 @@ function isValidOrderPayload(value: unknown): value is OrderPayload {
         typeof item.productId === "string" &&
         item.productId.length > 0 &&
         Number.isInteger(item.quantity) &&
-        item.quantity > 0
+        item.quantity > 0 &&
+        (item.selectedSize === undefined || typeof item.selectedSize === "string")
     )
   );
 }
@@ -68,8 +138,8 @@ export async function POST(request: Request) {
   }
 
   const subtotal = payload.items.reduce((sum, item) => {
-    const product = products.find((entry: { id: string; bulkPrice: unknown }) => entry.id === item.productId)!;
-    return sum + Number(product.bulkPrice) * item.quantity;
+    const product = products.find((entry: { id: string; bulkPrice: unknown; description: string | null }) => entry.id === item.productId)!;
+    return sum + resolveUnitPrice(product, item.selectedSize) * item.quantity;
   }, 0);
 
   let promoId: string | null = null;
@@ -83,11 +153,11 @@ export async function POST(request: Request) {
     }
 
     const pricedItems = payload.items.map((item) => {
-      const product = products.find((entry: { id: string; category: string; bulkPrice: unknown }) => entry.id === item.productId)!;
+      const product = products.find((entry: { id: string; category: string; bulkPrice: unknown; description: string | null }) => entry.id === item.productId)!;
       return {
         productId: product.id,
         category: product.category,
-        lineTotal: Number(product.bulkPrice) * item.quantity,
+        lineTotal: resolveUnitPrice(product, item.selectedSize) * item.quantity,
       };
     });
 
@@ -124,8 +194,8 @@ export async function POST(request: Request) {
           : payload.notes,
       items: {
         create: payload.items.map((item) => {
-          const product = products.find((entry: { id: string; bulkPrice: unknown }) => entry.id === item.productId)!;
-          const unitPrice = Number(product.bulkPrice);
+          const product = products.find((entry: { id: string; bulkPrice: unknown; description: string | null }) => entry.id === item.productId)!;
+          const unitPrice = resolveUnitPrice(product, item.selectedSize);
           return {
             productId: product.id,
             quantity: item.quantity,

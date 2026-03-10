@@ -18,6 +18,7 @@ type UpdateProductPayload = Partial<{
   discountPct: number;
   isActive: boolean;
   sizes: string[];
+  sizePrices: Record<string, number>;
 }>;
 
 function normalizeSizes(sizes: string[] | undefined): string[] {
@@ -32,16 +33,50 @@ function normalizeSizes(sizes: string[] | undefined): string[] {
     .slice(0, 12);
 }
 
-function mergeSizesIntoDescription(description: string | undefined, sizes: string[] | undefined) {
+function normalizeSizePrices(sizePrices: Record<string, number> | undefined): Record<string, number> {
+  if (!sizePrices || typeof sizePrices !== "object") {
+    return {};
+  }
+
+  const normalized: Record<string, number> = {};
+  for (const [size, price] of Object.entries(sizePrices)) {
+    const normalizedSize = String(size).trim();
+    const normalizedPrice = Number(price);
+    if (!normalizedSize || !Number.isFinite(normalizedPrice) || normalizedPrice <= 0) {
+      continue;
+    }
+    normalized[normalizedSize] = normalizedPrice;
+  }
+
+  return normalized;
+}
+
+function mergeSizesIntoDescription(
+  description: string | undefined,
+  sizes: string[] | undefined,
+  sizePrices: Record<string, number> | undefined
+) {
   const base = (description ?? "").trim();
   const normalizedSizes = normalizeSizes(sizes);
+  const normalizedSizePrices = normalizeSizePrices(sizePrices);
 
-  if (normalizedSizes.length === 0) {
+  if (normalizedSizes.length === 0 && Object.keys(normalizedSizePrices).length === 0) {
     return base || undefined;
   }
 
-  const payload = `[sizes]${normalizedSizes.join("|")}`;
-  return base ? `${base}\n\n${payload}` : payload;
+  const metadataParts: string[] = [];
+  if (normalizedSizes.length > 0) {
+    metadataParts.push(`[sizes]${normalizedSizes.join("|")}`);
+  }
+  if (Object.keys(normalizedSizePrices).length > 0) {
+    const pricesPayload = Object.entries(normalizedSizePrices)
+      .map(([size, price]) => `${size}:${price}`)
+      .join("|");
+    metadataParts.push(`[size_prices]${pricesPayload}`);
+  }
+
+  const metadata = metadataParts.join("\n");
+  return base ? `${base}\n\n${metadata}` : metadata;
 }
 
 function isValidUpdateProductPayload(value: unknown): value is UpdateProductPayload {
@@ -72,10 +107,10 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     return jsonError("Invalid product payload", 422);
   }
 
-  const { sizes, ...rest } = body;
+  const { sizes, sizePrices, ...rest } = body;
   let descriptionSource = body.description;
 
-  if (sizes !== undefined && descriptionSource === undefined) {
+  if ((sizes !== undefined || sizePrices !== undefined) && descriptionSource === undefined) {
     const existing = await prisma.product.findUnique({
       where: { id: params.id },
       select: { description: true },
@@ -87,8 +122,8 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     where: { id: params.id },
     data: {
       ...rest,
-      ...(sizes !== undefined || body.description !== undefined
-        ? { description: mergeSizesIntoDescription(descriptionSource, sizes) }
+      ...(sizes !== undefined || sizePrices !== undefined || body.description !== undefined
+        ? { description: mergeSizesIntoDescription(descriptionSource, sizes, sizePrices) }
         : {}),
     },
   });

@@ -22,6 +22,7 @@ type ProductFormRecord = {
   slug: string;
   description: string;
   sizes: string;
+  sizePrices: string;
   category: string;
   imageUrl: string;
   price: string;
@@ -84,6 +85,7 @@ function readCell(row: Record<string, unknown>, keys: string[]) {
 }
 
 const SIZES_MARKER = "[sizes]";
+const SIZE_PRICES_MARKER = "[size_prices]";
 
 function parseSizesInput(value: string): string[] {
   return value
@@ -94,30 +96,88 @@ function parseSizesInput(value: string): string[] {
     .slice(0, 12);
 }
 
-function splitDescriptionAndSizes(value: string | null | undefined) {
-  const descriptionRaw = (value ?? "").trim();
-  const markerIndex = descriptionRaw.lastIndexOf(SIZES_MARKER);
+function parseSizePricesInput(value: string): Record<string, number> {
+  const result: Record<string, number> = {};
 
-  if (markerIndex === -1) {
-    return { description: descriptionRaw, sizes: [] as string[] };
+  const entries = value
+    .split(/[|,]/g)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  for (const entry of entries) {
+    const [sizeRaw, priceRaw] = entry.split(":");
+    const size = String(sizeRaw ?? "").trim();
+    const price = Number(String(priceRaw ?? "").trim());
+    if (!size || !Number.isFinite(price) || price <= 0) {
+      continue;
+    }
+    result[size] = price;
   }
 
-  const description = descriptionRaw.slice(0, markerIndex).trim();
-  const sizesRaw = descriptionRaw.slice(markerIndex + SIZES_MARKER.length).trim();
+  return result;
+}
+
+function serializeSizePrices(value: Record<string, number>) {
+  return Object.entries(value)
+    .filter(([, price]) => Number.isFinite(price) && price > 0)
+    .map(([size, price]) => `${size}:${price}`)
+    .join(" | ");
+}
+
+function extractMarkerPayload(source: string, marker: string) {
+  const markerIndex = source.indexOf(marker);
+  if (markerIndex === -1) {
+    return "";
+  }
+
+  const afterMarker = source.slice(markerIndex + marker.length);
+  const nextIndexes = [SIZES_MARKER, SIZE_PRICES_MARKER]
+    .map((candidate) => afterMarker.indexOf(candidate))
+    .filter((index) => index >= 0);
+
+  const endIndex = nextIndexes.length > 0 ? Math.min(...nextIndexes) : afterMarker.length;
+  return afterMarker.slice(0, endIndex).trim();
+}
+
+function splitDescriptionAndSizes(value: string | null | undefined) {
+  const descriptionRaw = (value ?? "").trim();
+  const sizeMarkerIndex = descriptionRaw.indexOf(SIZES_MARKER);
+  const sizePricesMarkerIndex = descriptionRaw.indexOf(SIZE_PRICES_MARKER);
+
+  const metadataIndexes = [sizeMarkerIndex, sizePricesMarkerIndex].filter((index) => index >= 0);
+  const metadataStartIndex = metadataIndexes.length > 0 ? Math.min(...metadataIndexes) : -1;
+
+  if (metadataStartIndex === -1) {
+    return { description: descriptionRaw, sizes: [] as string[], sizePrices: {} as Record<string, number> };
+  }
+
+  const description = descriptionRaw.slice(0, metadataStartIndex).trim();
+  const metadataSection = descriptionRaw.slice(metadataStartIndex);
+
   return {
     description,
-    sizes: parseSizesInput(sizesRaw),
+    sizes: parseSizesInput(extractMarkerPayload(metadataSection, SIZES_MARKER)),
+    sizePrices: parseSizePricesInput(extractMarkerPayload(metadataSection, SIZE_PRICES_MARKER)),
   };
 }
 
-function buildDescriptionWithSizes(description: string, sizes: string[]) {
+function buildDescriptionWithSizes(description: string, sizes: string[], sizePrices: Record<string, number>) {
   const cleanDescription = description.trim();
-  if (sizes.length === 0) {
+  const sizePricesValue = serializeSizePrices(sizePrices);
+  if (sizes.length === 0 && !sizePricesValue) {
     return cleanDescription;
   }
 
-  const sizesPayload = `${SIZES_MARKER}${sizes.join("|")}`;
-  return cleanDescription ? `${cleanDescription}\n\n${sizesPayload}` : sizesPayload;
+  const metadataParts: string[] = [];
+  if (sizes.length > 0) {
+    metadataParts.push(`${SIZES_MARKER}${sizes.join("|")}`);
+  }
+  if (sizePricesValue) {
+    metadataParts.push(`${SIZE_PRICES_MARKER}${sizePricesValue.replace(/\s*\|\s*/g, "|")}`);
+  }
+
+  const metadata = metadataParts.join("\n");
+  return cleanDescription ? `${cleanDescription}\n\n${metadata}` : metadata;
 }
 
 async function generateSimpleSku() {
@@ -147,6 +207,7 @@ async function createProduct(formData: FormData) {
 
   const sku = skuInput || (await generateSimpleSku());
   const sizes = parseSizesInput(getText(formData.get("sizes")));
+  const sizePrices = parseSizePricesInput(getText(formData.get("sizePrices")));
 
   const slugInput = getText(formData.get("slug"));
   const imageUrlText = getText(formData.get("imageUrl"));
@@ -165,7 +226,7 @@ async function createProduct(formData: FormData) {
       sku,
       name,
       slug: slugInput || slugify(name),
-      description: buildDescriptionWithSizes(getText(formData.get("description")), sizes) || null,
+      description: buildDescriptionWithSizes(getText(formData.get("description")), sizes, sizePrices) || null,
       category,
       imageUrl,
       price: toNumber(formData.get("price"), 0),
@@ -216,7 +277,12 @@ async function updateProduct(formData: FormData) {
       sku: getText(formData.get("sku")),
       name,
       slug: getText(formData.get("slug")) || slugify(name),
-      description: buildDescriptionWithSizes(getText(formData.get("description")), parseSizesInput(getText(formData.get("sizes")))) || null,
+      description:
+        buildDescriptionWithSizes(
+          getText(formData.get("description")),
+          parseSizesInput(getText(formData.get("sizes"))),
+          parseSizePricesInput(getText(formData.get("sizePrices")))
+        ) || null,
       category: getText(formData.get("category")),
       imageUrl,
       price: toNumber(formData.get("price"), 0),
@@ -271,10 +337,11 @@ async function importProducts(formData: FormData) {
 
     const category = readCell(row, ["category", "Category"]) || "Groceries";
     const sizes = parseSizesInput(readCell(row, ["sizes", "Sizes", "size", "Size"]));
+    const sizePrices = parseSizePricesInput(readCell(row, ["sizePrices", "size_prices", "Size Prices", "size price"]));
     const slug = readCell(row, ["slug", "Slug"]) || slugify(name);
     const imageUrl = readCell(row, ["imageUrl", "image", "Image", "Image URL"]) || FALLBACK_IMAGE_URL;
     const descriptionText = readCell(row, ["description", "Description"]);
-    const description = buildDescriptionWithSizes(descriptionText, sizes) || null;
+    const description = buildDescriptionWithSizes(descriptionText, sizes, sizePrices) || null;
 
     const price = Number(readCell(row, ["price", "Price"]) || "0");
     const bulkPrice = Number(readCell(row, ["bulkPrice", "bulk_price", "Bulk Price"]) || String(price || 0));
@@ -343,7 +410,11 @@ export default async function AdminProductsPage() {
   const rows: ProductFormRecord[] = products.map((product) => ({
     ...(() => {
       const details = splitDescriptionAndSizes(product.description);
-      return { description: details.description, sizes: details.sizes.join(" | ") };
+      return {
+        description: details.description,
+        sizes: details.sizes.join(" | "),
+        sizePrices: serializeSizePrices(details.sizePrices),
+      };
     })(),
     id: product.id,
     sku: product.sku,
@@ -395,6 +466,7 @@ export default async function AdminProductsPage() {
           <input name="stockQty" type="number" min="0" placeholder="Stock qty" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="discountPct" type="number" min="0" max="100" placeholder="Discount %" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="sizes" placeholder="Sizes (e.g. S | M | L or 250ml, 500ml)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+          <input name="sizePrices" placeholder="Price per size (e.g. S:1200 | M:1500)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="imageUrl" placeholder="Image URL (optional)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="imageFile" type="file" accept="image/*" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <textarea name="description" placeholder="Description (optional)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2 xl:col-span-3" rows={3} />
@@ -407,7 +479,7 @@ export default async function AdminProductsPage() {
       <section className="admin-card">
         <h3 className="text-base font-bold text-gray-900">Import Products From Excel</h3>
         <p className="mt-1 text-xs text-gray-600">
-          Upload `.xlsx`, `.xls`, or `.csv` with columns like: `sku`, `name`, `category`, `sizes`, `price`, `bulkPrice`, `minOrder`, `stockQty`, `discountPct`, `imageUrl`.
+          Upload `.xlsx`, `.xls`, or `.csv` with columns like: `sku`, `name`, `category`, `sizes`, `sizePrices`, `price`, `bulkPrice`, `minOrder`, `stockQty`, `discountPct`, `imageUrl`.
         </p>
         <p className="mt-1 text-xs text-gray-600">
           Homepage sliding offers auto-refresh from product data. Update `discountPct` and product image to control what appears in the slider.
@@ -457,6 +529,7 @@ export default async function AdminProductsPage() {
                     Min order: {row.minOrder} | Stock: {row.stockQty} | Discount: {row.discountPct}%
                   </p>
                   {row.sizes ? <p className="mt-1 text-xs font-medium text-gray-600">Sizes: {row.sizes}</p> : null}
+                  {row.sizePrices ? <p className="mt-1 text-xs font-medium text-gray-600">Size prices: {row.sizePrices}</p> : null}
 
                   <details className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
                     <summary className="cursor-pointer rounded-lg bg-gray-900 px-3 py-2 text-center text-sm font-semibold text-white">
@@ -483,6 +556,7 @@ export default async function AdminProductsPage() {
                         <input name="stockQty" type="number" min="0" defaultValue={row.stockQty} className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
                         <input name="discountPct" type="number" min="0" max="100" defaultValue={row.discountPct} className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
                         <input name="sizes" defaultValue={row.sizes} className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2" placeholder="Sizes (e.g. S | M | L or 250ml, 500ml)" />
+                        <input name="sizePrices" defaultValue={row.sizePrices} className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2" placeholder="Price per size (e.g. S:1200 | M:1500)" />
                         <input name="imageUrl" defaultValue={row.imageUrl} className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2" placeholder="Image URL" />
                         <input name="imageFile" type="file" accept="image/*" className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2" />
                       </div>

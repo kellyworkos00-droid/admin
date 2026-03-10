@@ -17,6 +17,7 @@ type CreateProductPayload = {
   stockQty?: number;
   discountPct?: number;
   sizes?: string[];
+  sizePrices?: Record<string, number>;
 };
 
 const FALLBACK_IMAGE_URL = "https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=1200&q=80";
@@ -72,16 +73,50 @@ function normalizeSizes(sizes: string[] | undefined): string[] {
     .slice(0, 12);
 }
 
-function withSizesInDescription(description: string | undefined, sizes: string[] | undefined) {
+function normalizeSizePrices(sizePrices: Record<string, number> | undefined): Record<string, number> {
+  if (!sizePrices || typeof sizePrices !== "object") {
+    return {};
+  }
+
+  const normalized: Record<string, number> = {};
+  for (const [size, price] of Object.entries(sizePrices)) {
+    const normalizedSize = String(size).trim();
+    const normalizedPrice = Number(price);
+    if (!normalizedSize || !Number.isFinite(normalizedPrice) || normalizedPrice <= 0) {
+      continue;
+    }
+    normalized[normalizedSize] = normalizedPrice;
+  }
+
+  return normalized;
+}
+
+function withSizesInDescription(
+  description: string | undefined,
+  sizes: string[] | undefined,
+  sizePrices: Record<string, number> | undefined
+) {
   const base = (description ?? "").trim();
   const normalizedSizes = normalizeSizes(sizes);
+  const normalizedSizePrices = normalizeSizePrices(sizePrices);
 
-  if (normalizedSizes.length === 0) {
+  if (normalizedSizes.length === 0 && Object.keys(normalizedSizePrices).length === 0) {
     return base || undefined;
   }
 
-  const payload = `[sizes]${normalizedSizes.join("|")}`;
-  return base ? `${base}\n\n${payload}` : payload;
+  const metadataParts: string[] = [];
+  if (normalizedSizes.length > 0) {
+    metadataParts.push(`[sizes]${normalizedSizes.join("|")}`);
+  }
+  if (Object.keys(normalizedSizePrices).length > 0) {
+    const pricesPayload = Object.entries(normalizedSizePrices)
+      .map(([size, price]) => `${size}:${price}`)
+      .join("|");
+    metadataParts.push(`[size_prices]${pricesPayload}`);
+  }
+
+  const metadata = metadataParts.join("\n");
+  return base ? `${base}\n\n${metadata}` : metadata;
 }
 
 export async function POST(request: Request) {
@@ -108,7 +143,7 @@ export async function POST(request: Request) {
       price: body.price,
       bulkPrice: body.bulkPrice,
       minOrder: body.minOrder,
-      description: withSizesInDescription(body.description, body.sizes),
+      description: withSizesInDescription(body.description, body.sizes, body.sizePrices),
       imageUrl: body.imageUrl?.trim() || FALLBACK_IMAGE_URL,
       stockQty: body.stockQty ?? 0,
       discountPct: body.discountPct ?? 0,
