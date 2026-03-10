@@ -3,6 +3,9 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit";
 
+const ORDER_STATUSES = ["PENDING", "CONFIRMED", "PACKING", "SHIPPED", "DELIVERED", "CANCELLED"] as const;
+type OrderStatusValue = (typeof ORDER_STATUSES)[number];
+
 type OrdersPageProps = {
   searchParams?: {
     status?: string;
@@ -24,7 +27,8 @@ async function updateOrderStatus(formData: FormData) {
   "use server";
 
   const id = String(formData.get("id") ?? "").trim();
-  const status = String(formData.get("status") ?? "").trim() as Prisma.OrderStatus;
+  const statusRaw = String(formData.get("status") ?? "").trim();
+  const status = ORDER_STATUSES.find((value) => value === statusRaw);
   if (!id || !status) {
     return;
   }
@@ -53,9 +57,10 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
   const payment = searchParams?.payment?.trim();
   const date = searchParams?.date?.trim();
   const query = searchParams?.q?.trim();
+  const safeStatus = ORDER_STATUSES.find((value) => value === status);
 
   const where: Prisma.OrderWhereInput = {
-    ...(status ? { status: status as Prisma.OrderStatus } : {}),
+    ...(safeStatus ? { status: safeStatus as OrderStatusValue } : {}),
     ...(payment ? { paymentMethod: payment as Prisma.PaymentMethod } : {}),
     ...(query
       ? {
