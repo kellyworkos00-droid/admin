@@ -127,7 +127,22 @@ export default async function AdminContentPage() {
               <label className="text-sm text-gray-700">CTA Link<input name={`link_${slide.id}`} defaultValue={slide.link} className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" /></label>
               <label className="text-sm text-gray-700">Sort Order<input name={`sort_${slide.id}`} type="number" min="1" defaultValue={slide.sortOrder} className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" /></label>
               <label className="text-sm text-gray-700 md:col-span-2 xl:col-span-3">Image URL<input name={`image_${slide.id}`} defaultValue={slide.image} className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" /></label>
-              <label className="text-sm text-gray-700 md:col-span-2 xl:col-span-3">Upload New Image<input name={`imageFile_${slide.id}`} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" /></label>
+              <label className="text-sm text-gray-700 md:col-span-2 xl:col-span-3">
+                Upload New Image
+                <input
+                  name={`imageFile_${slide.id}`}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-rose-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-rose-700 hover:file:bg-rose-200"
+                />
+                <span className="mt-1 block text-xs text-gray-500">Leave empty to keep the current image.</span>
+              </label>
+              <div className="md:col-span-2 xl:col-span-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Current Image Preview</p>
+                <div className="mt-2 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
+                  <img src={slide.image} alt={`Slide ${index + 1} preview`} className="h-36 w-full object-cover" />
+                </div>
+              </div>
               <label className="text-sm text-gray-700 md:col-span-2 xl:col-span-3">Stats (separate with |)<input name={`stats_${slide.id}`} defaultValue={slide.stats.join(" | ")} className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" /></label>
               <label className="flex items-center gap-2 text-sm text-gray-700"><input name={`active_${slide.id}`} type="checkbox" defaultChecked={slide.isActive} className="h-4 w-4 rounded border-gray-300" /> Active</label>
             </div>
