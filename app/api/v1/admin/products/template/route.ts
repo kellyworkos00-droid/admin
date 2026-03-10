@@ -24,8 +24,9 @@ export async function GET() {
   XLSX.utils.book_append_sheet(workbook, worksheet, "products-template");
 
   const content = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  const body = new Uint8Array(content);
 
-  return new Response(content, {
+  return new Response(body, {
     status: 200,
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
