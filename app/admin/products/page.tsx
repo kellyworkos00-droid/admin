@@ -6,6 +6,15 @@ import { sendAdminAlert } from "@/lib/alerts";
 
 const FALLBACK_IMAGE_URL = "https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=1200&q=80";
 
+const HOME_BROWSE_CATEGORIES = [
+  "Groceries",
+  "Home & Living",
+  "Electronics",
+  "Tools & Hardware",
+  "Fashion & Apparel",
+  "Health & Beauty",
+];
+
 type ProductFormRecord = {
   id: string;
   sku: string;
@@ -353,6 +362,7 @@ export default async function AdminProductsPage() {
   const existingCategories = Array.from(new Set(products.map((product) => product.category.trim()).filter(Boolean))).sort((a, b) =>
     a.localeCompare(b)
   );
+  const categoryOptions = Array.from(new Set([...HOME_BROWSE_CATEGORIES, ...existingCategories]));
 
   return (
     <main className="space-y-5">
@@ -369,20 +379,16 @@ export default async function AdminProductsPage() {
           <input name="sku" placeholder="SKU (optional, auto: ET-001)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="name" required placeholder="Product name" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="slug" placeholder="Slug (optional)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-          <div>
-            <input
-              name="category"
-              required
-              placeholder="Category"
-              list="existing-categories"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-            />
-            <datalist id="existing-categories">
-              {existingCategories.map((category) => (
-                <option key={category} value={category} />
-              ))}
-            </datalist>
-          </div>
+          <select name="category" required defaultValue="" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm">
+            <option value="" disabled>
+              Select category
+            </option>
+            {categoryOptions.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
           <input name="price" required type="number" min="0" step="0.01" placeholder="Retail price (KES)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="bulkPrice" required type="number" min="0" step="0.01" placeholder="Bulk price (KES)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="minOrder" required type="number" min="1" placeholder="Minimum order" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
@@ -464,7 +470,13 @@ export default async function AdminProductsPage() {
                         <input name="name" defaultValue={row.name} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
                         <input name="sku" defaultValue={row.sku} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
                         <input name="slug" defaultValue={row.slug} className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                        <input name="category" list="existing-categories" defaultValue={row.category} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+                        <select name="category" defaultValue={row.category} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm">
+                          {categoryOptions.map((category) => (
+                            <option key={`${row.id}-${category}`} value={category}>
+                              {category}
+                            </option>
+                          ))}
+                        </select>
                         <input name="price" type="number" min="0" step="0.01" defaultValue={row.price} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
                         <input name="bulkPrice" type="number" min="0" step="0.01" defaultValue={row.bulkPrice} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
                         <input name="minOrder" type="number" min="1" defaultValue={row.minOrder} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
