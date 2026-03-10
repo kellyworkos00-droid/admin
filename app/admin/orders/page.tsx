@@ -5,6 +5,8 @@ import { logAuditEvent } from "@/lib/audit";
 
 const ORDER_STATUSES = ["PENDING", "CONFIRMED", "PACKING", "SHIPPED", "DELIVERED", "CANCELLED"] as const;
 type OrderStatusValue = (typeof ORDER_STATUSES)[number];
+const PAYMENT_METHODS = ["CARD", "MPESA", "BANK", "COD"] as const;
+type PaymentMethodValue = (typeof PAYMENT_METHODS)[number];
 
 type OrdersPageProps = {
   searchParams?: {
@@ -58,10 +60,11 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
   const date = searchParams?.date?.trim();
   const query = searchParams?.q?.trim();
   const safeStatus = ORDER_STATUSES.find((value) => value === status);
+  const safePayment = PAYMENT_METHODS.find((value) => value === payment);
 
   const where: Prisma.OrderWhereInput = {
     ...(safeStatus ? { status: safeStatus as OrderStatusValue } : {}),
-    ...(payment ? { paymentMethod: payment as Prisma.PaymentMethod } : {}),
+    ...(safePayment ? { paymentMethod: safePayment as PaymentMethodValue } : {}),
     ...(query
       ? {
           OR: [
