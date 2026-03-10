@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
 import { logAuditEvent } from "@/lib/audit";
@@ -260,10 +261,20 @@ async function updateProduct(formData: FormData) {
   }
 
   const name = getText(formData.get("name"));
+  const sku = getText(formData.get("sku"));
+  const category = getText(formData.get("category"));
+  if (!name || !sku || !category) {
+    return;
+  }
   const imageUrlText = getText(formData.get("imageUrl"));
   const imageFile = formData.get("imageFile");
 
-  let imageUrl = imageUrlText || FALLBACK_IMAGE_URL;
+  const existing = await prisma.product.findUnique({
+    where: { id },
+    select: { imageUrl: true },
+  });
+
+  let imageUrl = imageUrlText || existing?.imageUrl || FALLBACK_IMAGE_URL;
   if (imageFile instanceof File && imageFile.size > 0) {
     const uploadedImageUrl = await fileToDataUrl(imageFile);
     if (uploadedImageUrl) {
@@ -274,7 +285,7 @@ async function updateProduct(formData: FormData) {
   const updated = await prisma.product.update({
     where: { id },
     data: {
-      sku: getText(formData.get("sku")),
+      sku,
       name,
       slug: getText(formData.get("slug")) || slugify(name),
       description:
@@ -283,7 +294,7 @@ async function updateProduct(formData: FormData) {
           parseSizesInput(getText(formData.get("sizes"))),
           parseSizePricesInput(getText(formData.get("sizePrices")))
         ) || null,
-      category: getText(formData.get("category")),
+      category,
       imageUrl,
       price: toNumber(formData.get("price"), 0),
       bulkPrice: toNumber(formData.get("bulkPrice"), 0),
@@ -467,7 +478,6 @@ export default async function AdminProductsPage() {
           <input name="discountPct" type="number" min="0" max="100" placeholder="Discount %" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="sizes" placeholder="Sizes (e.g. S | M | L or 250ml, 500ml)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="sizePrices" placeholder="Price per size (e.g. S:1200 | M:1500)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-          <input name="imageUrl" placeholder="Image URL (optional)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="imageFile" type="file" accept="image/*" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <textarea name="description" placeholder="Description (optional)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2 xl:col-span-3" rows={3} />
           <button type="submit" className="rounded-xl bg-gradient-to-r from-rose-700 to-red-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-rose-800 hover:to-red-700 md:w-fit">
@@ -499,7 +509,12 @@ export default async function AdminProductsPage() {
       </section>
 
       <section className="admin-card">
-        <h3 className="mb-4 text-base font-bold text-gray-900">Edit Products</h3>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-bold text-gray-900">Edit Products</h3>
+            <p className="mt-1 text-xs text-gray-600">Open the full editor page for cleaner product updates and safer saves.</p>
+          </div>
+        </div>
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {rows.length === 0 ? (
             <p className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">No products yet. Add one manually or import from Excel.</p>
@@ -531,49 +546,33 @@ export default async function AdminProductsPage() {
                   {row.sizes ? <p className="mt-1 text-xs font-medium text-gray-600">Sizes: {row.sizes}</p> : null}
                   {row.sizePrices ? <p className="mt-1 text-xs font-medium text-gray-600">Size prices: {row.sizePrices}</p> : null}
 
-                  <details className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
-                    <summary className="cursor-pointer rounded-lg bg-gray-900 px-3 py-2 text-center text-sm font-semibold text-white">
-                      Edit Product
-                    </summary>
-
-                    <form action={updateProduct} className="mt-3 space-y-3" encType="multipart/form-data">
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Link
+                      href={`/admin/products/${row.id}`}
+                      className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+                    >
+                      Open Editor
+                    </Link>
+                    <form action={updateProduct} encType="multipart/form-data">
                       <input type="hidden" name="id" value={row.id} />
-
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <input name="name" defaultValue={row.name} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                        <input name="sku" defaultValue={row.sku} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                        <input name="slug" defaultValue={row.slug} className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                        <select name="category" defaultValue={row.category} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm">
-                          {categoryOptions.map((category) => (
-                            <option key={`${row.id}-${category}`} value={category}>
-                              {category}
-                            </option>
-                          ))}
-                        </select>
-                        <input name="price" type="number" min="0" step="0.01" defaultValue={row.price} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                        <input name="bulkPrice" type="number" min="0" step="0.01" defaultValue={row.bulkPrice} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                        <input name="minOrder" type="number" min="1" defaultValue={row.minOrder} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                        <input name="stockQty" type="number" min="0" defaultValue={row.stockQty} className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                        <input name="discountPct" type="number" min="0" max="100" defaultValue={row.discountPct} className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                        <input name="sizes" defaultValue={row.sizes} className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2" placeholder="Sizes (e.g. S | M | L or 250ml, 500ml)" />
-                        <input name="sizePrices" defaultValue={row.sizePrices} className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2" placeholder="Price per size (e.g. S:1200 | M:1500)" />
-                        <input name="imageUrl" defaultValue={row.imageUrl} className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2" placeholder="Image URL" />
-                        <input name="imageFile" type="file" accept="image/*" className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2" />
-                      </div>
-
-                      <textarea name="description" rows={2} defaultValue={row.description} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <label className="flex items-center gap-2 text-sm text-gray-700">
-                          <input name="isActive" type="checkbox" defaultChecked={row.isActive} className="h-4 w-4 rounded border-gray-300" />
-                          Active
-                        </label>
-                        <button type="submit" className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800">
-                          Save Changes
-                        </button>
-                      </div>
+                      <input type="hidden" name="name" value={row.name} />
+                      <input type="hidden" name="sku" value={row.sku} />
+                      <input type="hidden" name="slug" value={row.slug} />
+                      <input type="hidden" name="category" value={row.category} />
+                      <input type="hidden" name="price" value={row.price} />
+                      <input type="hidden" name="bulkPrice" value={row.bulkPrice} />
+                      <input type="hidden" name="minOrder" value={row.minOrder} />
+                      <input type="hidden" name="stockQty" value={row.stockQty} />
+                      <input type="hidden" name="discountPct" value={row.discountPct} />
+                      <input type="hidden" name="sizes" value={row.sizes} />
+                      <input type="hidden" name="sizePrices" value={row.sizePrices} />
+                      <input type="hidden" name="description" value={row.description} />
+                      {row.isActive ? <input type="hidden" name="isActive" value="on" /> : null}
+                      <button type="submit" className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        Save Current Values
+                      </button>
                     </form>
-                  </details>
+                  </div>
                 </div>
               </div>
             </article>
