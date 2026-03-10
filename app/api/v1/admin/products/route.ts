@@ -16,6 +16,7 @@ type CreateProductPayload = {
   minOrder: number;
   stockQty?: number;
   discountPct?: number;
+  sizes?: string[];
 };
 
 const FALLBACK_IMAGE_URL = "https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=1200&q=80";
@@ -59,6 +60,30 @@ function isValidCreateProductPayload(value: unknown): value is CreateProductPayl
   );
 }
 
+function normalizeSizes(sizes: string[] | undefined): string[] {
+  if (!Array.isArray(sizes)) {
+    return [];
+  }
+
+  return sizes
+    .map((size) => String(size).trim())
+    .filter(Boolean)
+    .filter((size, index, all) => all.findIndex((item) => item.toLowerCase() === size.toLowerCase()) === index)
+    .slice(0, 12);
+}
+
+function withSizesInDescription(description: string | undefined, sizes: string[] | undefined) {
+  const base = (description ?? "").trim();
+  const normalizedSizes = normalizeSizes(sizes);
+
+  if (normalizedSizes.length === 0) {
+    return base || undefined;
+  }
+
+  const payload = `[sizes]${normalizedSizes.join("|")}`;
+  return base ? `${base}\n\n${payload}` : payload;
+}
+
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) {
     return jsonError("Unauthorized", 401);
@@ -76,7 +101,14 @@ export async function POST(request: Request) {
 
   const created = await prisma.product.create({
     data: {
-      ...body,
+      sku: body.sku,
+      name: body.name,
+      slug: body.slug,
+      category: body.category,
+      price: body.price,
+      bulkPrice: body.bulkPrice,
+      minOrder: body.minOrder,
+      description: withSizesInDescription(body.description, body.sizes),
       imageUrl: body.imageUrl?.trim() || FALLBACK_IMAGE_URL,
       stockQty: body.stockQty ?? 0,
       discountPct: body.discountPct ?? 0,

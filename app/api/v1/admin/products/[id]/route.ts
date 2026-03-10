@@ -17,7 +17,32 @@ type UpdateProductPayload = Partial<{
   stockQty: number;
   discountPct: number;
   isActive: boolean;
+  sizes: string[];
 }>;
+
+function normalizeSizes(sizes: string[] | undefined): string[] {
+  if (!Array.isArray(sizes)) {
+    return [];
+  }
+
+  return sizes
+    .map((size) => String(size).trim())
+    .filter(Boolean)
+    .filter((size, index, all) => all.findIndex((item) => item.toLowerCase() === size.toLowerCase()) === index)
+    .slice(0, 12);
+}
+
+function mergeSizesIntoDescription(description: string | undefined, sizes: string[] | undefined) {
+  const base = (description ?? "").trim();
+  const normalizedSizes = normalizeSizes(sizes);
+
+  if (normalizedSizes.length === 0) {
+    return base || undefined;
+  }
+
+  const payload = `[sizes]${normalizedSizes.join("|")}`;
+  return base ? `${base}\n\n${payload}` : payload;
+}
 
 function isValidUpdateProductPayload(value: unknown): value is UpdateProductPayload {
   if (!value || typeof value !== "object") {
@@ -47,9 +72,25 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     return jsonError("Invalid product payload", 422);
   }
 
+  const { sizes, ...rest } = body;
+  let descriptionSource = body.description;
+
+  if (sizes !== undefined && descriptionSource === undefined) {
+    const existing = await prisma.product.findUnique({
+      where: { id: params.id },
+      select: { description: true },
+    });
+    descriptionSource = existing?.description ?? undefined;
+  }
+
   const updated = await prisma.product.update({
     where: { id: params.id },
-    data: body,
+    data: {
+      ...rest,
+      ...(sizes !== undefined || body.description !== undefined
+        ? { description: mergeSizesIntoDescription(descriptionSource, sizes) }
+        : {}),
+    },
   });
 
   await logAuditEvent({

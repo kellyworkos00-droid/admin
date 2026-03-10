@@ -12,6 +12,7 @@ export async function GET() {
       price: 4500,
       bulkPrice: 4200,
       minOrder: 10,
+      sizes: "5kg|10kg|25kg|50kg",
       stockQty: 120,
       discountPct: 7,
     },

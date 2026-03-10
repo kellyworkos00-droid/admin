@@ -12,6 +12,7 @@ type ProductFormRecord = {
   name: string;
   slug: string;
   description: string;
+  sizes: string;
   category: string;
   imageUrl: string;
   price: string;
@@ -73,6 +74,43 @@ function readCell(row: Record<string, unknown>, keys: string[]) {
   return "";
 }
 
+const SIZES_MARKER = "[sizes]";
+
+function parseSizesInput(value: string): string[] {
+  return value
+    .split(/[|,\/]/g)
+    .map((size) => size.trim())
+    .filter(Boolean)
+    .filter((size, index, all) => all.findIndex((item) => item.toLowerCase() === size.toLowerCase()) === index)
+    .slice(0, 12);
+}
+
+function splitDescriptionAndSizes(value: string | null | undefined) {
+  const descriptionRaw = (value ?? "").trim();
+  const markerIndex = descriptionRaw.lastIndexOf(SIZES_MARKER);
+
+  if (markerIndex === -1) {
+    return { description: descriptionRaw, sizes: [] as string[] };
+  }
+
+  const description = descriptionRaw.slice(0, markerIndex).trim();
+  const sizesRaw = descriptionRaw.slice(markerIndex + SIZES_MARKER.length).trim();
+  return {
+    description,
+    sizes: parseSizesInput(sizesRaw),
+  };
+}
+
+function buildDescriptionWithSizes(description: string, sizes: string[]) {
+  const cleanDescription = description.trim();
+  if (sizes.length === 0) {
+    return cleanDescription;
+  }
+
+  const sizesPayload = `${SIZES_MARKER}${sizes.join("|")}`;
+  return cleanDescription ? `${cleanDescription}\n\n${sizesPayload}` : sizesPayload;
+}
+
 async function generateSimpleSku() {
   const totalProducts = await prisma.product.count();
   let nextNumber = totalProducts + 1;
@@ -99,6 +137,7 @@ async function createProduct(formData: FormData) {
   }
 
   const sku = skuInput || (await generateSimpleSku());
+  const sizes = parseSizesInput(getText(formData.get("sizes")));
 
   const slugInput = getText(formData.get("slug"));
   const imageUrlText = getText(formData.get("imageUrl"));
@@ -117,7 +156,7 @@ async function createProduct(formData: FormData) {
       sku,
       name,
       slug: slugInput || slugify(name),
-      description: getText(formData.get("description")) || null,
+      description: buildDescriptionWithSizes(getText(formData.get("description")), sizes) || null,
       category,
       imageUrl,
       price: toNumber(formData.get("price"), 0),
@@ -168,7 +207,7 @@ async function updateProduct(formData: FormData) {
       sku: getText(formData.get("sku")),
       name,
       slug: getText(formData.get("slug")) || slugify(name),
-      description: getText(formData.get("description")) || null,
+      description: buildDescriptionWithSizes(getText(formData.get("description")), parseSizesInput(getText(formData.get("sizes")))) || null,
       category: getText(formData.get("category")),
       imageUrl,
       price: toNumber(formData.get("price"), 0),
@@ -222,9 +261,11 @@ async function importProducts(formData: FormData) {
     const resolvedSku = sku || (await generateSimpleSku());
 
     const category = readCell(row, ["category", "Category"]) || "Groceries";
+    const sizes = parseSizesInput(readCell(row, ["sizes", "Sizes", "size", "Size"]));
     const slug = readCell(row, ["slug", "Slug"]) || slugify(name);
     const imageUrl = readCell(row, ["imageUrl", "image", "Image", "Image URL"]) || FALLBACK_IMAGE_URL;
-    const description = readCell(row, ["description", "Description"]) || null;
+    const descriptionText = readCell(row, ["description", "Description"]);
+    const description = buildDescriptionWithSizes(descriptionText, sizes) || null;
 
     const price = Number(readCell(row, ["price", "Price"]) || "0");
     const bulkPrice = Number(readCell(row, ["bulkPrice", "bulk_price", "Bulk Price"]) || String(price || 0));
@@ -291,11 +332,14 @@ export default async function AdminProductsPage() {
   });
 
   const rows: ProductFormRecord[] = products.map((product) => ({
+    ...(() => {
+      const details = splitDescriptionAndSizes(product.description);
+      return { description: details.description, sizes: details.sizes.join(" | ") };
+    })(),
     id: product.id,
     sku: product.sku,
     name: product.name,
     slug: product.slug,
-    description: product.description ?? "",
     category: product.category,
     imageUrl: product.imageUrl,
     price: String(Number(product.price)),
@@ -305,6 +349,10 @@ export default async function AdminProductsPage() {
     discountPct: String(product.discountPct),
     isActive: product.isActive,
   }));
+
+  const existingCategories = Array.from(new Set(products.map((product) => product.category.trim()).filter(Boolean))).sort((a, b) =>
+    a.localeCompare(b)
+  );
 
   return (
     <main className="space-y-5">
@@ -321,12 +369,26 @@ export default async function AdminProductsPage() {
           <input name="sku" placeholder="SKU (optional, auto: ET-001)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="name" required placeholder="Product name" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="slug" placeholder="Slug (optional)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-          <input name="category" required placeholder="Category" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+          <div>
+            <input
+              name="category"
+              required
+              placeholder="Category"
+              list="existing-categories"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+            />
+            <datalist id="existing-categories">
+              {existingCategories.map((category) => (
+                <option key={category} value={category} />
+              ))}
+            </datalist>
+          </div>
           <input name="price" required type="number" min="0" step="0.01" placeholder="Retail price (KES)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="bulkPrice" required type="number" min="0" step="0.01" placeholder="Bulk price (KES)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="minOrder" required type="number" min="1" placeholder="Minimum order" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="stockQty" type="number" min="0" placeholder="Stock qty" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="discountPct" type="number" min="0" max="100" placeholder="Discount %" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+          <input name="sizes" placeholder="Sizes (e.g. S | M | L or 250ml, 500ml)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="imageUrl" placeholder="Image URL (optional)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <input name="imageFile" type="file" accept="image/*" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <textarea name="description" placeholder="Description (optional)" className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2 xl:col-span-3" rows={3} />
@@ -339,7 +401,7 @@ export default async function AdminProductsPage() {
       <section className="admin-card">
         <h3 className="text-base font-bold text-gray-900">Import Products From Excel</h3>
         <p className="mt-1 text-xs text-gray-600">
-          Upload `.xlsx`, `.xls`, or `.csv` with columns like: `sku`, `name`, `category`, `price`, `bulkPrice`, `minOrder`, `stockQty`, `discountPct`, `imageUrl`.
+          Upload `.xlsx`, `.xls`, or `.csv` with columns like: `sku`, `name`, `category`, `sizes`, `price`, `bulkPrice`, `minOrder`, `stockQty`, `discountPct`, `imageUrl`.
         </p>
         <p className="mt-1 text-xs text-gray-600">
           Homepage sliding offers auto-refresh from product data. Update `discountPct` and product image to control what appears in the slider.
@@ -388,6 +450,7 @@ export default async function AdminProductsPage() {
                   <p className="mt-3 text-sm text-gray-600">
                     Min order: {row.minOrder} | Stock: {row.stockQty} | Discount: {row.discountPct}%
                   </p>
+                  {row.sizes ? <p className="mt-1 text-xs font-medium text-gray-600">Sizes: {row.sizes}</p> : null}
 
                   <details className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
                     <summary className="cursor-pointer rounded-lg bg-gray-900 px-3 py-2 text-center text-sm font-semibold text-white">
@@ -401,12 +464,13 @@ export default async function AdminProductsPage() {
                         <input name="name" defaultValue={row.name} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
                         <input name="sku" defaultValue={row.sku} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
                         <input name="slug" defaultValue={row.slug} className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                        <input name="category" defaultValue={row.category} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+                        <input name="category" list="existing-categories" defaultValue={row.category} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
                         <input name="price" type="number" min="0" step="0.01" defaultValue={row.price} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
                         <input name="bulkPrice" type="number" min="0" step="0.01" defaultValue={row.bulkPrice} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
                         <input name="minOrder" type="number" min="1" defaultValue={row.minOrder} required className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
                         <input name="stockQty" type="number" min="0" defaultValue={row.stockQty} className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
                         <input name="discountPct" type="number" min="0" max="100" defaultValue={row.discountPct} className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+                        <input name="sizes" defaultValue={row.sizes} className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2" placeholder="Sizes (e.g. S | M | L or 250ml, 500ml)" />
                         <input name="imageUrl" defaultValue={row.imageUrl} className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2" placeholder="Image URL" />
                         <input name="imageFile" type="file" accept="image/*" className="rounded-xl border border-gray-200 px-3 py-2 text-sm md:col-span-2" />
                       </div>
