@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 
 export type AuditAction =
   | "ORDER_STATUS_UPDATED"
+  | "ORDER_DISPATCH_ASSIGNED"
   | "PRODUCT_CREATED"
   | "PRODUCT_UPDATED"
   | "PRODUCT_DEACTIVATED"
