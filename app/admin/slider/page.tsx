@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { revalidatePath } from "next/cache";
 import { getSliderManagerRows, saveSliderConfig } from "@/lib/slider";
 import { logAuditEvent } from "@/lib/audit";

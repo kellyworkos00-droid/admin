@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
+let ensureSliderItemsInitPromise: Promise<void> | null = null;
+
 export type SliderProduct = {
   id: string;
   name: string;
@@ -25,19 +27,32 @@ export type SliderManagerRow = {
 };
 
 export async function ensureSliderItemsTable() {
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS slider_items (
-      product_id TEXT PRIMARY KEY,
-      is_featured BOOLEAN NOT NULL DEFAULT FALSE,
-      sort_order INTEGER NOT NULL DEFAULT 999,
-      start_at TIMESTAMPTZ NULL,
-      end_at TIMESTAMPTZ NULL,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
+  if (!ensureSliderItemsInitPromise) {
+    ensureSliderItemsInitPromise = (async () => {
+      await prisma.$executeRawUnsafe(`
+        DO $$
+        BEGIN
+          CREATE TABLE slider_items (
+            product_id TEXT PRIMARY KEY,
+            is_featured BOOLEAN NOT NULL DEFAULT FALSE,
+            sort_order INTEGER NOT NULL DEFAULT 999,
+            start_at TIMESTAMPTZ NULL,
+            end_at TIMESTAMPTZ NULL,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          );
+        EXCEPTION
+          WHEN duplicate_table OR duplicate_object THEN
+            NULL;
+        END
+        $$;
+      `);
 
-  await prisma.$executeRawUnsafe(`ALTER TABLE slider_items ADD COLUMN IF NOT EXISTS start_at TIMESTAMPTZ NULL;`);
-  await prisma.$executeRawUnsafe(`ALTER TABLE slider_items ADD COLUMN IF NOT EXISTS end_at TIMESTAMPTZ NULL;`);
+      await prisma.$executeRawUnsafe(`ALTER TABLE slider_items ADD COLUMN IF NOT EXISTS start_at TIMESTAMPTZ NULL;`);
+      await prisma.$executeRawUnsafe(`ALTER TABLE slider_items ADD COLUMN IF NOT EXISTS end_at TIMESTAMPTZ NULL;`);
+    })();
+  }
+
+  await ensureSliderItemsInitPromise;
 }
 
 export async function upsertSliderItem(

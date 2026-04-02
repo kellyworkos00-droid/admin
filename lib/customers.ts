@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
+let ensureCustomerProfilesInitPromise: Promise<void> | null = null;
+
 export type CustomerProfile = {
   customerKey: string;
   displayName: string | null;
@@ -9,16 +11,27 @@ export type CustomerProfile = {
 };
 
 export async function ensureCustomerProfilesTable() {
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS customer_profiles (
-      customer_key TEXT PRIMARY KEY,
-      display_name TEXT NULL,
-      phone TEXT NULL,
-      email TEXT NULL,
-      is_vip BOOLEAN NOT NULL DEFAULT FALSE,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
+  if (!ensureCustomerProfilesInitPromise) {
+    ensureCustomerProfilesInitPromise = prisma.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        CREATE TABLE customer_profiles (
+          customer_key TEXT PRIMARY KEY,
+          display_name TEXT NULL,
+          phone TEXT NULL,
+          email TEXT NULL,
+          is_vip BOOLEAN NOT NULL DEFAULT FALSE,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      EXCEPTION
+        WHEN duplicate_table OR duplicate_object THEN
+          NULL;
+      END
+      $$;
+    `).then(() => undefined);
+  }
+
+  await ensureCustomerProfilesInitPromise;
 }
 
 export async function getCustomerProfiles(keys: string[]): Promise<CustomerProfile[]> {
