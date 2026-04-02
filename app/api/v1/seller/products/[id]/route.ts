@@ -2,6 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 
+function isValidImageInput(value: unknown): boolean {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  return (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:image/")
+  );
+}
+
 /**
  * GET /api/v1/seller/products/[id]
  * Get product details
@@ -137,14 +154,22 @@ export async function PUT(
       isActive,
     } = await req.json();
 
+    if (imageUrl !== undefined && imageUrl !== "" && !isValidImageInput(imageUrl)) {
+      return NextResponse.json(
+        { error: "Invalid image. Use a valid URL or upload an image file." },
+        { status: 400 }
+      );
+    }
+
     const updateData: any = {};
     if (name) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (category) updateData.category = category;
-    if (imageUrl) updateData.imageUrl = imageUrl;
+    if (imageUrl) updateData.imageUrl = imageUrl.trim();
     if (price) updateData.price = new Decimal(price.toString());
     if (bulkPrice) updateData.bulkPrice = new Decimal(bulkPrice.toString());
     if (minOrder !== undefined) updateData.minOrder = parseInt(minOrder);
+    if (maxOrder !== undefined) updateData.maxOrder = maxOrder ? parseInt(maxOrder) : null;
     if (stockQty !== undefined) updateData.stockQty = parseInt(stockQty);
     if (discountPct !== undefined) updateData.discountPct = parseInt(discountPct);
     if (isActive !== undefined) updateData.isActive = isActive;

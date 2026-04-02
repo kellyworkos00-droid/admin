@@ -2,6 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 
+function isValidImageInput(value: unknown): boolean {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  return (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:image/")
+  );
+}
+
 /**
  * GET /api/v1/seller/products
  * Get all products for a seller with caching headers and optimized queries
@@ -142,6 +159,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (imageUrl && !isValidImageInput(imageUrl)) {
+      return NextResponse.json(
+        { error: "Invalid image. Use a valid URL or upload an image file." },
+        { status: 400 }
+      );
+    }
+
     // Validate SKU uniqueness
     const existing = await prisma.product.findUnique({
       where: { sku: sku.trim() },
@@ -165,10 +189,11 @@ export async function POST(req: NextRequest) {
         slug,
         description: description?.trim() || "",
         category: category.trim(),
-        imageUrl: imageUrl || "https://via.placeholder.com/400",
+        imageUrl: imageUrl?.trim() || "https://via.placeholder.com/400",
         price: new Decimal(price || 0),
         bulkPrice: new Decimal(bulkPrice || price || 0),
         minOrder: Math.max(1, parseInt(minOrder) || 1),
+        maxOrder: maxOrder ? Math.max(1, parseInt(maxOrder)) : null,
         stockQty: Math.max(0, parseInt(stockQty) || 0),
         discountPct: Math.max(0, Math.min(100, parseInt(discountPct) || 0)),
         isActive: true,

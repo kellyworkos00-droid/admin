@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Decimal } from "@prisma/client/runtime/library";
 
 interface ProductFormProps {
   sellerId: string;
@@ -45,6 +44,7 @@ export function ProductForm({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [imageFileName, setImageFileName] = useState<string>("");
 
   const isEditing = !!productId;
 
@@ -112,6 +112,43 @@ export function ProductForm({
     }));
   };
 
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+    if (!allowedTypes.has(file.type)) {
+      setError("Unsupported image type. Use JPG, PNG, WEBP, or GIF.");
+      return;
+    }
+
+    const maxBytes = 3 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setError("Image is too large. Max size is 3MB.");
+      return;
+    }
+
+    setImageFileName(file.name);
+    setError("");
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (!result.startsWith("data:image/")) {
+        setError("Failed to process selected image. Try another file.");
+        return;
+      }
+
+      setFormData((prev) => ({ ...prev, imageUrl: result }));
+    };
+    reader.onerror = () => {
+      setError("Failed to read image file.");
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg border">
       <h2 className="text-lg font-bold mb-6">
@@ -173,15 +210,32 @@ export function ProductForm({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Image URL</label>
+            <label className="block text-sm font-medium mb-1">Image URL or Upload</label>
             <input
-              type="url"
+              type="text"
               name="imageUrl"
               value={formData.imageUrl}
               onChange={handleChange}
               className="w-full px-3 py-2 border rounded-lg"
-              placeholder="https://..."
+              placeholder="Paste image URL or choose a file below"
             />
+
+            <div className="mt-2">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handleImageFileChange}
+                className="w-full text-sm"
+              />
+              <p className="mt-1 text-xs text-gray-500">Upload from your device (max 3MB).</p>
+              {imageFileName ? <p className="mt-1 text-xs text-emerald-700">Selected: {imageFileName}</p> : null}
+            </div>
+
+            {formData.imageUrl ? (
+              <div className="mt-3 overflow-hidden rounded-lg border bg-gray-50">
+                <img src={formData.imageUrl} alt="Preview" className="h-28 w-full object-cover" />
+              </div>
+            ) : null}
           </div>
         </div>
 
