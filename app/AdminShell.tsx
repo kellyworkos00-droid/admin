@@ -34,6 +34,7 @@ const allNavItems = [
 ];
 
 const sellerNavItems = [
+  { label: "Dashboard", href: "/seller", icon: FiGrid },
   { label: "My Products", href: "/seller/products", icon: FiPackage },
   { label: "My Orders", href: "/seller/orders", icon: FiShoppingBag },
 ];

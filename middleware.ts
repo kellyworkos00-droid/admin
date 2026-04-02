@@ -30,7 +30,7 @@ export function middleware(request: NextRequest) {
       }
 
       if (session.sellerId) {
-        return NextResponse.redirect(new URL("/seller/products", request.url));
+        return NextResponse.redirect(new URL("/seller", request.url));
       }
     }
     return NextResponse.next();
@@ -43,7 +43,7 @@ export function middleware(request: NextRequest) {
     }
 
     if (session.role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/seller/products", request.url));
+      return NextResponse.redirect(new URL("/seller", request.url));
     }
   }
 

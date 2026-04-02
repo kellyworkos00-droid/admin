@@ -23,7 +23,27 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      router.push('/admin');
+
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        try {
+          const decoded = JSON.parse(Buffer.from(token, 'base64').toString()) as {
+            role?: 'ADMIN' | 'STAFF' | 'CUSTOMER';
+            sellerId?: string;
+          };
+
+          if (decoded.role === 'CUSTOMER' && decoded.sellerId) {
+            router.push('/seller');
+          } else {
+            router.push('/admin');
+          }
+        } catch {
+          router.push('/admin');
+        }
+      } else {
+        router.push('/admin');
+      }
+
       router.refresh();
     } catch (err: any) {
       setError(err.message || 'Login failed');
