@@ -1,10 +1,12 @@
 import { cookies } from "next/headers";
+import { isMainAdminIdentity } from "@/lib/admin-policy";
 
 export interface AuthUser {
   id: string;
   email: string;
   role: "ADMIN" | "STAFF" | "CUSTOMER";
   sellerId?: string;
+  isMainAdmin?: boolean;
 }
 
 /**
@@ -21,8 +23,13 @@ export function getAuthToken(): string | null {
  */
 export function verifyAuthToken(token: string): AuthUser | null {
   try {
-    const decoded = JSON.parse(Buffer.from(token, "base64").toString());
-    return decoded;
+    const decoded = JSON.parse(Buffer.from(token, "base64").toString()) as AuthUser;
+    return {
+      ...decoded,
+      isMainAdmin:
+        decoded.isMainAdmin === true ||
+        isMainAdminIdentity(decoded.email, decoded.role),
+    };
   } catch (e) {
     return null;
   }
@@ -50,6 +57,11 @@ export function isAuthenticated(): boolean {
 export function isAdmin(): boolean {
   const user = getCurrentUser();
   return user?.role === "ADMIN";
+}
+
+export function isMainAdmin(): boolean {
+  const user = getCurrentUser();
+  return user?.isMainAdmin === true;
 }
 
 /**

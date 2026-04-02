@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ensureAdmin } from "@/lib/auth-guard";
+import { ensureMainAdmin } from "@/lib/auth-guard";
 
 // Type Definitions
 type SellerStatus = "PENDING" | "VERIFIED" | "SUSPENDED" | "REJECTED";
@@ -27,7 +27,7 @@ export async function GET(
 ) {
   try {
     // Verify admin access
-    const authResult = ensureAdmin(req);
+    const authResult = ensureMainAdmin(req);
     if (authResult instanceof NextResponse) {
       return authResult;
     }
@@ -122,7 +122,7 @@ export async function PUT(
 ) {
   try {
     // Verify admin access
-    const authResult = ensureAdmin(req);
+    const authResult = ensureMainAdmin(req);
     if (authResult instanceof NextResponse) {
       return authResult;
     }
@@ -220,7 +220,7 @@ export async function DELETE(
 ) {
   try {
     // Verify admin access
-    const authResult = ensureAdmin(req);
+    const authResult = ensureMainAdmin(req);
     if (authResult instanceof NextResponse) {
       return authResult;
     }

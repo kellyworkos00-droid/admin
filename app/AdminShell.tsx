@@ -24,12 +24,13 @@ const allNavItems = [
   { label: "Dashboard", href: "/admin", icon: FiGrid },
   { label: "Products", href: "/admin/products", icon: FiPackage },
   { label: "Orders", href: "/admin/orders", icon: FiShoppingBag },
-  { label: "Slider", href: "/admin/slider", icon: FiImage, adminOnly: true },
+  { label: "Slider", href: "/admin/slider", icon: FiImage, adminOnly: true, mainAdminOnly: true },
   { label: "Analytics", href: "/admin/analytics", icon: FiTrendingUp },
   { label: "Customers", href: "/admin/customers", icon: FiUsers },
   { label: "Promos", href: "/admin/promos", icon: FiTag },
-  { label: "Content", href: "/admin/content", icon: FiFileText, adminOnly: true },
-  { label: "Audit Logs", href: "/admin/audit", icon: FiClipboard, adminOnly: true },
+  { label: "Sellers", href: "/admin/sellers", icon: FiUsers, adminOnly: true, mainAdminOnly: true },
+  { label: "Content", href: "/admin/content", icon: FiFileText, adminOnly: true, mainAdminOnly: true },
+  { label: "Audit Logs", href: "/admin/audit", icon: FiClipboard, adminOnly: true, mainAdminOnly: true },
 ];
 
 type Props = {
@@ -44,6 +45,7 @@ export default function AdminShell({ children, lowStockCount, newOrdersCount }: 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isMainAdmin, setIsMainAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load user info from token
@@ -54,6 +56,7 @@ export default function AdminShell({ children, lowStockCount, newOrdersCount }: 
         const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
         setUserRole(decoded.role);
         setUserEmail(decoded.email);
+        setIsMainAdmin(decoded.isMainAdmin === true);
       } catch (e) {
         console.error('Failed to parse token');
       }
@@ -86,6 +89,9 @@ export default function AdminShell({ children, lowStockCount, newOrdersCount }: 
   // Filter nav items based on role
   const navItems = allNavItems.filter((item) => {
     if (item.adminOnly && userRole !== "ADMIN") {
+      return false;
+    }
+    if (item.mainAdminOnly && !isMainAdmin) {
       return false;
     }
     return true;
@@ -177,7 +183,7 @@ export default function AdminShell({ children, lowStockCount, newOrdersCount }: 
             <p className="text-xs font-semibold text-gray-700">Logged in as</p>
             <p className="text-xs text-gray-600 truncate">{userEmail}</p>
             <p className="mt-1 inline-block rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700">
-              {userRole === 'ADMIN' ? '👑 Admin' : '🏪 Seller'}
+              {isMainAdmin ? '👑 Main Admin' : userRole === 'ADMIN' ? '🛡️ Admin' : '🏪 Seller'}
             </p>
           </div>
         )}
@@ -272,7 +278,7 @@ export default function AdminShell({ children, lowStockCount, newOrdersCount }: 
                 </Link>
               )}
               <div className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-bold text-rose-700">
-                {userRole === 'ADMIN' ? '👑 Admin' : '🏪 Seller'}
+                {isMainAdmin ? '👑 Main Admin' : userRole === 'ADMIN' ? '🛡️ Admin' : '🏪 Seller'}
               </div>
             </div>
           </div>

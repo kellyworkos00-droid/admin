@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { ensureMainAdmin } from "@/lib/auth-guard";
 
 // Type definitions
 type SellerStatus = "PENDING" | "VERIFIED" | "SUSPENDED" | "REJECTED";
@@ -10,6 +11,11 @@ type SellerStatus = "PENDING" | "VERIFIED" | "SUSPENDED" | "REJECTED";
  */
 export async function GET(req: NextRequest) {
   try {
+    const authResult = ensureMainAdmin(req);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "20");
     const offset = parseInt(searchParams.get("offset") || "0");
@@ -71,6 +77,11 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    const authResult = ensureMainAdmin(req);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
     const { businessName, businessType, phone, email, address, description } = await req.json();
 
     if (!businessName || !businessType || !phone || !email) {

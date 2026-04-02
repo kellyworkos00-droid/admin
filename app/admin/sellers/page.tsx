@@ -1,4 +1,5 @@
 import { SellersList } from "../components/SellersList";
+import { requireMainAdminPageAccess } from "@/lib/admin-page-guard";
 
 export const metadata = {
   title: "Sellers Management | Eterna Admin",
@@ -6,6 +7,8 @@ export const metadata = {
 };
 
 export default function SellersPage() {
+  requireMainAdminPageAccess();
+
   return (
     <div className="space-y-4">
       <div>

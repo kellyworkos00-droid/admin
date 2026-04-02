@@ -4,6 +4,7 @@ export const revalidate = 0;
 import { revalidatePath } from "next/cache";
 import { getSliderManagerRows, saveSliderConfig } from "@/lib/slider";
 import { logAuditEvent } from "@/lib/audit";
+import { requireMainAdminPageAccess } from "@/lib/admin-page-guard";
 import SliderManagerClient from "./SliderManagerClient";
 
 async function saveSliderItems(formData: FormData) {
@@ -39,6 +40,8 @@ async function saveSliderItems(formData: FormData) {
 }
 
 export default async function AdminSliderManagerPage() {
+  requireMainAdminPageAccess();
+
   const rows = await getSliderManagerRows();
 
   return <SliderManagerClient initialRows={rows} saveAction={saveSliderItems} />;

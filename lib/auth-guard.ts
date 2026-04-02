@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isMainAdminIdentity } from "@/lib/admin-policy";
 
 export interface AuthUser {
   id: string;
   email: string;
-  role: "ADMIN" | "CUSTOMER";
+  role: "ADMIN" | "STAFF" | "CUSTOMER";
   sellerId?: string;
+  isMainAdmin?: boolean;
 }
 
 /**
@@ -17,8 +19,13 @@ export function getAuthFromRequest(req: NextRequest): AuthUser | null {
 
     if (!token) return null;
 
-    const decoded = JSON.parse(Buffer.from(token, "base64").toString());
-    return decoded;
+    const decoded = JSON.parse(Buffer.from(token, "base64").toString()) as AuthUser;
+    return {
+      ...decoded,
+      isMainAdmin:
+        decoded.isMainAdmin === true ||
+        isMainAdminIdentity(decoded.email, decoded.role),
+    };
   } catch (e) {
     return null;
   }
@@ -48,6 +55,20 @@ export function ensureAdmin(
   if (!user || user.role !== "ADMIN") {
     return NextResponse.json(
       { error: "Admin access required" },
+      { status: 403 }
+    );
+  }
+  return user;
+}
+
+/**
+ * Verify user is the main admin account
+ */
+export function ensureMainAdmin(req: NextRequest): AuthUser | NextResponse {
+  const user = getAuthFromRequest(req);
+  if (!user || user.role !== "ADMIN" || user.isMainAdmin !== true) {
+    return NextResponse.json(
+      { error: "Main admin access required" },
       { status: 403 }
     );
   }

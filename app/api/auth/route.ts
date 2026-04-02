@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { isMainAdminIdentity } from "@/lib/admin-policy";
 
 /**
  * POST /api/auth/login
@@ -43,13 +44,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const isMainAdmin = isMainAdminIdentity(user.email, user.role);
+    const sellerId = user.role === "ADMIN" ? undefined : user.seller?.id;
+
     // Create session token
     const token = Buffer.from(
       JSON.stringify({
         id: user.id,
         email: user.email,
         role: user.role,
-        sellerId: user.seller?.id,
+        sellerId,
+        isMainAdmin,
       })
     ).toString("base64");
 
@@ -60,7 +65,8 @@ export async function POST(req: NextRequest) {
         fullName: user.fullName,
         email: user.email,
         role: user.role,
-        sellerId: user.seller?.id,
+        sellerId,
+        isMainAdmin,
       },
       token,
     });

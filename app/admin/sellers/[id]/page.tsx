@@ -1,4 +1,5 @@
 import { SellerDetailsView } from "@/app/admin/components/SellerDetailsView";
+import { requireMainAdminPageAccess } from "@/lib/admin-page-guard";
 
 interface SellerDetailPageProps {
   params: { id: string };
@@ -10,6 +11,8 @@ export const metadata = {
 };
 
 export default function SellerDetailPage({ params }: SellerDetailPageProps) {
+  requireMainAdminPageAccess();
+
   return (
     <div className="space-y-4">
       <div>

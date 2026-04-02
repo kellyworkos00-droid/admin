@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { getAdminApiIdentity, hasAdminPermission, isAdminRequest } from "@/lib/auth";
+import { getAdminApiIdentity, hasAdminPermission, isAdminRequest, isMainAdminActor } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
 import { serializeUser } from "@/lib/serializers";
 import { logAuditEvent } from "@/lib/audit";
 import { sendAdminAlert } from "@/lib/alerts";
+import { getMainAdminEmail } from "@/lib/admin-policy";
 
 const validRoles = new Set(["ADMIN", "STAFF", "CUSTOMER"]);
 type ValidRole = "ADMIN" | "STAFF" | "CUSTOMER";
@@ -22,6 +23,10 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   const identity = getAdminApiIdentity(request);
   if (!hasAdminPermission(identity.role, "users:manage")) {
     return jsonError("Forbidden", 403);
+  }
+
+  if (!isMainAdminActor(identity.actor)) {
+    return jsonError(`Only the main admin (${getMainAdminEmail()}) can grant user roles`, 403);
   }
 
   const body = await request.json().catch(() => null);

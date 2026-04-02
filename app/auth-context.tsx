@@ -8,6 +8,7 @@ export interface AuthUser {
   fullName: string;
   role: 'ADMIN' | 'STAFF' | 'CUSTOMER';
   sellerId?: string;
+  isMainAdmin?: boolean;
 }
 
 interface AuthContextType {
@@ -46,7 +47,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Verify token is still valid
           const decoded = JSON.parse(Buffer.from(storedToken, 'base64').toString());
           setToken(storedToken);
-          setUser(decoded);
+          setUser({
+            ...decoded,
+            isMainAdmin: decoded.isMainAdmin === true,
+          });
         }
       } catch (error) {
         console.error('Auth init error:', error);

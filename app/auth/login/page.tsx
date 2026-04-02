@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { FiMail, FiLock, FiEye, FiEyeOff, FiArrowRight } from 'react-icons/fi';
+import { useAuth } from '@/app/auth-context';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -20,39 +22,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Special handling for admin account
-      if (email.toLowerCase() === 'eterna@admin.com' && password === 'zach1234') {
-        // Create admin token directly
-        const adminToken = Buffer.from(
-          JSON.stringify({
-            id: 'admin-system',
-            email: 'eterna@admin.com',
-            fullName: 'System Admin',
-            role: 'ADMIN',
-            sellerId: undefined,
-          })
-        ).toString('base64');
-
-        localStorage.setItem('auth_token', adminToken);
-        router.push('/admin');
-        router.refresh();
-        return;
-      }
-
-      // Try seller account login
-      const res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Login failed');
-      }
-
-      const data = await res.json();
-      localStorage.setItem('auth_token', data.token);
+      await login(email, password);
       router.push('/admin');
       router.refresh();
     } catch (err: any) {
@@ -150,11 +120,10 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Demo info */}
+          {/* Security note */}
           <div className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
-            <p className="font-semibold mb-1">Admin Demo Credentials:</p>
-            <p>Email: <code className="font-mono bg-blue-100 px-1 rounded">eterna@admin.com</code></p>
-            <p>Password: <code className="font-mono bg-blue-100 px-1 rounded">zach1234</code></p>
+            <p className="font-semibold mb-1">Security Notice:</p>
+            <p>Main admin credentials are managed on the server and are not hardcoded in the UI.</p>
           </div>
         </div>
       </div>

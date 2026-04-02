@@ -1,4 +1,5 @@
 import { listAuditEvents } from "@/lib/audit";
+import { requireMainAdminPageAccess } from "@/lib/admin-page-guard";
 
 type AuditPageProps = {
   searchParams?: {
@@ -17,6 +18,8 @@ function tryFormatMetadata(raw: string) {
 }
 
 export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
+  requireMainAdminPageAccess();
+
   const action = searchParams?.action?.trim() || undefined;
   const entityType = searchParams?.entity?.trim() || undefined;
   const alertsEnabled = Boolean(process.env.ADMIN_ALERT_WEBHOOK_URL?.trim());

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { getMainAdminEmail, isMainAdminIdentity } from "@/lib/admin-policy";
 
 /**
  * POST /api/auth/signup
@@ -30,6 +31,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Password must be at least 6 characters" },
         { status: 400 }
+      );
+    }
+
+    if (email.toLowerCase() === getMainAdminEmail()) {
+      return NextResponse.json(
+        { error: "This email is reserved for the main admin account" },
+        { status: 403 }
       );
     }
 
@@ -68,6 +76,8 @@ export async function POST(req: NextRequest) {
       include: { seller: true },
     });
 
+    const isMainAdmin = isMainAdminIdentity(user.email, user.role);
+
     // Create session token
     const token = Buffer.from(
       JSON.stringify({
@@ -75,6 +85,7 @@ export async function POST(req: NextRequest) {
         email: user.email,
         role: user.role,
         sellerId: user.seller?.id,
+        isMainAdmin,
       })
     ).toString("base64");
 
@@ -88,6 +99,7 @@ export async function POST(req: NextRequest) {
           email: user.email,
           role: user.role,
           sellerId: user.seller?.id,
+          isMainAdmin,
         },
         token,
       },

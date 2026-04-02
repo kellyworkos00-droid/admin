@@ -1,18 +1,42 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const mainAdminEmail = (process.env.MAIN_ADMIN_EMAIL || "eterna@admin.com").toLowerCase();
+  const mainAdminPassword = process.env.MAIN_ADMIN_PASSWORD || "ChangeMe123!";
+  const mainAdminHash = await bcrypt.hash(mainAdminPassword, 10);
+  const sellerPasswordHash = await bcrypt.hash(process.env.DEMO_SELLER_PASSWORD || "demo1234", 10);
+
+  await prisma.user.upsert({
+    where: { email: mainAdminEmail },
+    update: {
+      fullName: "Main Admin",
+      role: "ADMIN",
+      passwordHash: mainAdminHash,
+      isActive: true,
+    },
+    create: {
+      fullName: "Main Admin",
+      email: mainAdminEmail,
+      passwordHash: mainAdminHash,
+      role: "ADMIN",
+      isActive: true,
+    },
+  });
+
   // Upsert user by email
   const user = await prisma.user.upsert({
     where: { email: "demo-seller@example.com" },
-    update: {},
+    update: { passwordHash: sellerPasswordHash, role: "CUSTOMER", isActive: true },
     create: {
       fullName: "Demo Seller",
       email: "demo-seller@example.com",
       phone: "0700000000",
-      passwordHash: "demo1234", // Set a real hash in production
+      passwordHash: sellerPasswordHash,
       role: "CUSTOMER",
+      isActive: true,
     },
   });
 
@@ -163,7 +187,7 @@ async function main() {
     });
   }
 
-  console.log("Seeded demo seller and products.");
+  console.log("Seeded main admin, demo seller, and products.");
 }
 
 main()

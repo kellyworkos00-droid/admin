@@ -4,6 +4,7 @@ export const revalidate = 0;
 import { revalidatePath } from "next/cache";
 import { listHomeSlides, saveHomeSlides, type HomeSlide } from "@/lib/content";
 import { logAuditEvent } from "@/lib/audit";
+import { requireMainAdminPageAccess } from "@/lib/admin-page-guard";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -105,6 +106,8 @@ async function saveContent(formData: FormData) {
 }
 
 export default async function AdminContentPage() {
+  requireMainAdminPageAccess();
+
   const slides = await listHomeSlides();
   const activeSlides = slides.filter((slide) => slide.isActive).length;
 

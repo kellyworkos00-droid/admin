@@ -7,6 +7,11 @@ export function isAdminRequest(request: Request): boolean {
   return token === expected;
 }
 
+export function isMainAdminActor(actor: string): boolean {
+  const expected = (process.env.MAIN_ADMIN_EMAIL || "eterna@admin.com").trim().toLowerCase();
+  return actor.trim().toLowerCase() === expected;
+}
+
 export type AdminRole = "ADMIN" | "STAFF" | "SYSTEM";
 
 export type AdminPermission =
