@@ -71,7 +71,7 @@ export function serializeOrder(order: Order & { items?: OrderItem[] }) {
   return {
     ...order,
     subtotal: decimalToNumber(order.subtotal),
-    shippingFee: decimalToNumber(order.shippingFee),
+    shippingFee: decimalToNumber(order.deliveryFee),
     total: decimalToNumber(order.total),
     items: order.items?.map((item) => ({
       ...item,

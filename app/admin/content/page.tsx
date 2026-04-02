@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { revalidatePath } from "next/cache";
 import { listHomeSlides, saveHomeSlides, type HomeSlide } from "@/lib/content";
 import { logAuditEvent } from "@/lib/audit";

@@ -1,7 +1,8 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
-import AdminShell from "./AdminShell";
+import AdminLayoutWrapper from "./AdminLayoutWrapper";
+import { AuthProvider } from "./auth-context";
 
 export const metadata: Metadata = {
   title: "Eterna Admin",
@@ -17,9 +18,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en">
       <body className="admin-shell">
-        <AdminShell lowStockCount={lowStockCount} newOrdersCount={newOrdersCount}>
-          {children}
-        </AdminShell>
+        <AuthProvider>
+          <AdminLayoutWrapper lowStockCount={lowStockCount} newOrdersCount={newOrdersCount}>
+            {children}
+          </AdminLayoutWrapper>
+        </AuthProvider>
       </body>
     </html>
   );

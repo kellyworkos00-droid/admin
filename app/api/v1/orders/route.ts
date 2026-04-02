@@ -2,8 +2,11 @@ import { prisma } from "@/lib/prisma";
 import { jsonError, jsonNoContent, jsonOk } from "@/lib/api";
 import { calculatePromoDiscount, consumePromo, getValidPromoByCode } from "@/lib/promos";
 import { serializeOrder } from "@/lib/serializers";
+import { calculateOrderCommissions } from "@/lib/commissions";
+import { Decimal } from "@prisma/client/runtime/library";
 
 type OrderPayload = {
+  sellerId?: string; // Optional - if provided, seller commission will be calculated
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
@@ -12,6 +15,7 @@ type OrderPayload = {
   notes?: string;
   paymentMethod: "CARD" | "MPESA" | "BANK" | "COD";
   promoCode?: string;
+  deliveryFee?: number; // Delivery fee for commission calculation
   items: Array<{ productId: string; quantity: number; selectedSize?: string }>;
 };
 
@@ -174,10 +178,43 @@ export async function POST(request: Request) {
   const shippingFee = 750;
   const total = Math.max(0, subtotal - discountAmount) + shippingFee;
   const orderNumber = `ETR-${Date.now()}`;
+  const resolvedSellerId = payload.sellerId ?? (products[0] as { sellerId?: string }).sellerId;
+
+  if (!resolvedSellerId) {
+    return jsonError("Unable to resolve seller for order", 422);
+  }
+
+  // Handle seller commission
+  let sellerCommissions: any = null;
+  let platformFee = 0;
+  let sellerPayout = subtotal;
+  let escrowAmount = total;
+  let pickupOtp = null;
+  let deliveryOtp = null;
+
+  // Verify seller exists
+  const seller = await prisma.seller.findUnique({
+    where: { id: resolvedSellerId },
+  });
+
+  if (!seller) {
+    return jsonError("Seller not found", 404);
+  }
+
+  // Calculate commissions
+  sellerCommissions = calculateOrderCommissions(subtotal, payload.deliveryFee || 0);
+  platformFee = sellerCommissions.platformFee;
+  sellerPayout = sellerCommissions.sellerPayout;
+  escrowAmount = sellerCommissions.escrowAmount;
+
+  // Generate OTPs for verification
+  pickupOtp = Math.random().toString().slice(-6);
+  deliveryOtp = Math.random().toString().slice(-6);
 
   const order = await prisma.order.create({
     data: {
       orderNumber,
+      seller: { connect: { id: resolvedSellerId } },
       customerName: payload.customerName,
       customerPhone: payload.customerPhone,
       customerEmail: payload.customerEmail,
@@ -185,9 +222,15 @@ export async function POST(request: Request) {
       city: payload.city,
       paymentMethod: payload.paymentMethod,
       paymentStatus: payload.paymentMethod === "COD" ? "PENDING" : "PENDING",
-      subtotal,
-      shippingFee,
-      total,
+      subtotal: new Decimal(subtotal.toString()),
+      deliveryFee: new Decimal((payload.deliveryFee || shippingFee).toString()),
+      platformFee: new Decimal(platformFee.toString()),
+      sellerPayout: new Decimal(sellerPayout.toString()),
+      escrowAmount: new Decimal(escrowAmount.toString()),
+      total: new Decimal(total.toString()),
+      status: "PENDING",
+      pickupOtp,
+      deliveryOtp,
       notes:
         promoCodeUsed && discountAmount > 0
           ? `${payload.notes ? `${payload.notes} | ` : ""}Promo ${promoCodeUsed} applied (KES ${discountAmount.toFixed(2)})`
@@ -198,9 +241,11 @@ export async function POST(request: Request) {
           const unitPrice = resolveUnitPrice(product, item.selectedSize);
           return {
             productId: product.id,
+            productName: product.name,
+            productImage: product.imageUrl,
             quantity: item.quantity,
-            unitPrice,
-            lineTotal: unitPrice * item.quantity,
+            unitPrice: new Decimal(unitPrice.toString()),
+            lineTotal: new Decimal((unitPrice * item.quantity).toString()),
           };
         }),
       },

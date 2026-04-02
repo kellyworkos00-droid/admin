@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit";
 
-const ORDER_STATUSES = ["PENDING", "CONFIRMED", "PACKING", "SHIPPED", "DELIVERED", "CANCELLED"] as const;
+const ORDER_STATUSES = ["PENDING", "CONFIRMED", "PACKING", "ON_DELIVERY", "DELIVERED", "CANCELLED"] as const;
 type OrderStatusValue = (typeof ORDER_STATUSES)[number];
 const PAYMENT_METHODS = ["CARD", "MPESA", "BANK", "COD"] as const;
 type PaymentMethodValue = (typeof PAYMENT_METHODS)[number];
@@ -96,7 +96,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
       orderBy: { createdAt: "desc" },
     }),
     prisma.order.count({ where: { status: "PENDING" } }),
-    prisma.order.count({ where: { status: { in: ["SHIPPED", "PACKING"] } } }),
+    prisma.order.count({ where: { status: { in: ["ON_DELIVERY", "PACKING"] } } }),
     prisma.order.count({
       where: {
         status: "DELIVERED",
@@ -137,7 +137,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
             <option value="PENDING">Pending</option>
             <option value="CONFIRMED">Confirmed</option>
             <option value="PACKING">Packing</option>
-            <option value="SHIPPED">Shipped</option>
+            <option value="ON_DELIVERY">On Delivery</option>
             <option value="DELIVERED">Delivered</option>
             <option value="CANCELLED">Cancelled</option>
           </select>
@@ -170,7 +170,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
               <div className="flex flex-wrap gap-2">
                 <form action={updateOrderStatus}><input type="hidden" name="id" value={order.id} /><input type="hidden" name="status" value="CONFIRMED" /><button className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700">Confirm</button></form>
                 <form action={updateOrderStatus}><input type="hidden" name="id" value={order.id} /><input type="hidden" name="status" value="PACKING" /><button className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700">Pack</button></form>
-                <form action={updateOrderStatus}><input type="hidden" name="id" value={order.id} /><input type="hidden" name="status" value="SHIPPED" /><button className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700">Ship</button></form>
+                <form action={updateOrderStatus}><input type="hidden" name="id" value={order.id} /><input type="hidden" name="status" value="ON_DELIVERY" /><button className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700">Dispatch</button></form>
                 <form action={updateOrderStatus}><input type="hidden" name="id" value={order.id} /><input type="hidden" name="status" value="DELIVERED" /><button className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white">Deliver</button></form>
               </div>
             </div>

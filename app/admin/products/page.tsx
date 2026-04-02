@@ -5,6 +5,9 @@ import * as XLSX from "xlsx";
 import { logAuditEvent } from "@/lib/audit";
 import { sendAdminAlert } from "@/lib/alerts";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const FALLBACK_IMAGE_URL = "https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=1200&q=80";
 
 const HOME_BROWSE_CATEGORIES = [
@@ -222,6 +225,15 @@ async function createProduct(formData: FormData) {
     }
   }
 
+  const defaultSeller = await prisma.seller.findFirst({
+    where: { status: "VERIFIED" },
+    select: { id: true },
+  });
+
+  if (!defaultSeller) {
+    return;
+  }
+
   const created = await prisma.product.create({
     data: {
       sku,
@@ -236,6 +248,7 @@ async function createProduct(formData: FormData) {
       stockQty: Math.max(0, toInt(formData.get("stockQty"), 0)),
       discountPct: Math.max(0, toInt(formData.get("discountPct"), 0)),
       isActive: true,
+      seller: { connect: { id: defaultSeller.id } },
     },
   });
 
@@ -335,6 +348,14 @@ async function importProducts(formData: FormData) {
   const sheet = workbook.Sheets[firstSheetName];
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
 
+  const defaultSeller = await prisma.seller.findFirst({
+    where: { status: "VERIFIED" },
+    select: { id: true },
+  });
+  if (!defaultSeller) {
+    return;
+  }
+
   let importedCount = 0;
 
   for (const row of rows) {
@@ -375,6 +396,7 @@ async function importProducts(formData: FormData) {
         stockQty,
         discountPct,
         isActive: true,
+        seller: { connect: { id: defaultSeller.id } },
       },
       update: {
         name,

@@ -19,13 +19,36 @@ export async function GET(_request: Request, { params }: RouteContext) {
       isActive: true,
       OR: [{ id: token }, { slug: token }],
     },
+    include: {
+      seller: {
+        select: {
+          id: true,
+          businessName: true,
+          businessType: true,
+          logo: true,
+          rating: true,
+          description: true,
+          address: true,
+          phone: true,
+          email: true,
+          status: true,
+        },
+      },
+    },
   });
 
   if (!product) {
     return jsonError("Product not found", 404);
   }
 
-  return jsonOk(serializeProduct(product));
+  if (!product.seller || product.seller.status !== "VERIFIED") {
+    return jsonError("Product unavailable", 404);
+  }
+
+  return jsonOk({
+    ...serializeProduct(product),
+    seller: product.seller,
+  });
 }
 
 export function OPTIONS() {

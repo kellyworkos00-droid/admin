@@ -134,6 +134,14 @@ export async function POST(request: Request) {
     return jsonError("Invalid product payload", 422);
   }
 
+  const defaultSeller = await prisma.seller.findFirst({
+    where: { status: "VERIFIED" },
+    select: { id: true },
+  });
+  if (!defaultSeller) {
+    return jsonError("No verified seller found for product assignment", 422);
+  }
+
   const created = await prisma.product.create({
     data: {
       sku: body.sku,
@@ -147,6 +155,7 @@ export async function POST(request: Request) {
       imageUrl: body.imageUrl?.trim() || FALLBACK_IMAGE_URL,
       stockQty: body.stockQty ?? 0,
       discountPct: body.discountPct ?? 0,
+      seller: { connect: { id: defaultSeller.id } },
     },
   });
 

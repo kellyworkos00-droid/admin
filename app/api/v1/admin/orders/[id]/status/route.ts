@@ -4,9 +4,9 @@ import { jsonError, jsonOk } from "@/lib/api";
 import { serializeOrder } from "@/lib/serializers";
 import { logAuditEvent } from "@/lib/audit";
 
-type OrderStatusValue = "PENDING" | "CONFIRMED" | "PACKING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
+type OrderStatusValue = "PENDING" | "CONFIRMED" | "PACKING" | "ON_DELIVERY" | "DELIVERED" | "CANCELLED";
 
-const validStatuses: OrderStatusValue[] = ["PENDING", "CONFIRMED", "PACKING", "SHIPPED", "DELIVERED", "CANCELLED"];
+const validStatuses: OrderStatusValue[] = ["PENDING", "CONFIRMED", "PACKING", "ON_DELIVERY", "DELIVERED", "CANCELLED"];
 
 function isOrderStatus(value: string): value is OrderStatusValue {
   return validStatuses.includes(value as OrderStatusValue);
