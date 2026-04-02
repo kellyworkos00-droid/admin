@@ -33,6 +33,11 @@ const allNavItems = [
   { label: "Audit Logs", href: "/admin/audit", icon: FiClipboard, adminOnly: true, mainAdminOnly: true },
 ];
 
+const sellerNavItems = [
+  { label: "My Products", href: "/seller/products", icon: FiPackage },
+  { label: "My Orders", href: "/seller/orders", icon: FiShoppingBag },
+];
+
 type Props = {
   children: React.ReactNode;
   lowStockCount: number;
@@ -96,6 +101,7 @@ export default function AdminShell({ children, lowStockCount, newOrdersCount }: 
     }
     return true;
   });
+  const visibleNavItems = userRole === "CUSTOMER" ? sellerNavItems : navItems;
 
   const handleLogout = async () => {
     try {
@@ -160,7 +166,7 @@ export default function AdminShell({ children, lowStockCount, newOrdersCount }: 
 
       {/* Navigation */}
       <nav className="mt-4 flex-1 space-y-0.5 overflow-y-auto">
-        {navItems.map(({ label, href, icon: Icon }) => (
+        {visibleNavItems.map(({ label, href, icon: Icon }) => (
           <Link
             key={href}
             href={href}
