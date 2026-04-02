@@ -25,6 +25,15 @@ function formatKes(value: number) {
   }).format(value);
 }
 
+function getAdminAppBaseUrl() {
+  return (
+    process.env.ADMIN_APP_BASE_URL ||
+    process.env.NEXTAUTH_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    "http://localhost:3000"
+  );
+}
+
 async function updateOrderStatus(formData: FormData) {
   "use server";
 
@@ -50,6 +59,51 @@ async function updateOrderStatus(formData: FormData) {
       nextStatus: status,
     },
   });
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin");
+}
+
+async function assignOrderDispatch(formData: FormData) {
+  "use server";
+
+  const id = String(formData.get("id") ?? "").trim();
+  const riderName = String(formData.get("riderName") ?? "").trim();
+  const riderPhone = String(formData.get("riderPhone") ?? "").trim();
+  const logisticsPartner = String(formData.get("logisticsPartner") ?? "").trim();
+  const status = String(formData.get("dispatchStatus") ?? "").trim();
+
+  if (!id) {
+    return;
+  }
+
+  const adminToken = process.env.ADMIN_API_TOKEN;
+  if (!adminToken) {
+    throw new Error("ADMIN_API_TOKEN is not configured.");
+  }
+
+  const payload = {
+    riderName: riderName || undefined,
+    riderPhone: riderPhone || undefined,
+    logisticsPartner: logisticsPartner || undefined,
+    status: status || undefined,
+  };
+
+  const response = await fetch(`${getAdminAppBaseUrl()}/api/v1/admin/orders/${id}/dispatch`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "x-admin-token": adminToken,
+      "x-admin-user": "admin-ui",
+      "x-admin-role": "ADMIN",
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to assign dispatch details.");
+  }
+
   revalidatePath("/admin/orders");
   revalidatePath("/admin");
 }
@@ -114,7 +168,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
         <p className="mt-1 text-sm text-gray-600">Filter, search, and update order statuses quickly.</p>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-3">
         <div className="admin-card">
           <p className="text-sm text-gray-500">Pending</p>
           <p className="mt-2 text-3xl font-bold text-amber-600">{pendingCount}</p>
@@ -130,7 +184,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
       </section>
 
       <section className="admin-card">
-        <form className="grid gap-3 md:grid-cols-4">
+        <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <input name="q" defaultValue={query ?? ""} placeholder="Search order/phone/customer" className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
           <select name="status" defaultValue={status ?? ""} className="rounded-xl border border-gray-200 px-3 py-2 text-sm">
             <option value="">All statuses</option>
@@ -149,7 +203,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
             <option value="COD">Cash on Delivery</option>
           </select>
           <input type="date" name="date" defaultValue={date ?? ""} className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-          <button type="submit" className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 md:col-span-4 md:w-fit">
+          <button type="submit" className="rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 sm:col-span-2 lg:col-span-4 lg:w-fit">
             Apply Filters
           </button>
         </form>
@@ -167,11 +221,11 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
 
               <div className="text-sm font-semibold text-primary-700">{formatKes(Number(order.total))}</div>
 
-              <div className="flex flex-wrap gap-2">
-                <form action={updateOrderStatus}><input type="hidden" name="id" value={order.id} /><input type="hidden" name="status" value="CONFIRMED" /><button className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700">Confirm</button></form>
-                <form action={updateOrderStatus}><input type="hidden" name="id" value={order.id} /><input type="hidden" name="status" value="PACKING" /><button className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700">Pack</button></form>
-                <form action={updateOrderStatus}><input type="hidden" name="id" value={order.id} /><input type="hidden" name="status" value="ON_DELIVERY" /><button className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700">Dispatch</button></form>
-                <form action={updateOrderStatus}><input type="hidden" name="id" value={order.id} /><input type="hidden" name="status" value="DELIVERED" /><button className="rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white">Deliver</button></form>
+              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+                <form action={updateOrderStatus} className="w-full sm:w-auto"><input type="hidden" name="id" value={order.id} /><input type="hidden" name="status" value="CONFIRMED" /><button className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700">Confirm</button></form>
+                <form action={updateOrderStatus} className="w-full sm:w-auto"><input type="hidden" name="id" value={order.id} /><input type="hidden" name="status" value="PACKING" /><button className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700">Pack</button></form>
+                <form action={updateOrderStatus} className="w-full sm:w-auto"><input type="hidden" name="id" value={order.id} /><input type="hidden" name="status" value="ON_DELIVERY" /><button className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700">Dispatch</button></form>
+                <form action={updateOrderStatus} className="w-full sm:w-auto"><input type="hidden" name="id" value={order.id} /><input type="hidden" name="status" value="DELIVERED" /><button className="w-full rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white">Deliver</button></form>
               </div>
             </div>
 
@@ -182,6 +236,45 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
                 <p><span className="font-semibold">Payment:</span> {order.paymentMethod} ({order.paymentStatus})</p>
                 <p><span className="font-semibold">Address:</span> {order.addressLine1}, {order.city}</p>
                 <p><span className="font-semibold">Notes:</span> {order.notes || "-"}</p>
+                <div className="rounded-xl border border-gray-200 bg-white p-3">
+                  <p className="text-sm font-semibold text-gray-900">Dispatch Assignment</p>
+                  <p className="mt-1 text-xs text-gray-500">Assign rider details and optionally move dispatch status.</p>
+                  <form action={assignOrderDispatch} className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <input type="hidden" name="id" value={order.id} />
+                    <input
+                      name="riderName"
+                      defaultValue={order.riderName ?? ""}
+                      placeholder="Rider name"
+                      className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
+                    />
+                    <input
+                      name="riderPhone"
+                      defaultValue={order.riderPhone ?? ""}
+                      placeholder="Rider phone"
+                      className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
+                    />
+                    <input
+                      name="logisticsPartner"
+                      defaultValue={order.logisticsPartner ?? "Eterna Dispatch"}
+                      placeholder="Logistics partner"
+                      className="rounded-lg border border-gray-200 px-3 py-2 text-xs"
+                    />
+                    <select name="dispatchStatus" defaultValue="" className="rounded-lg border border-gray-200 px-3 py-2 text-xs">
+                      <option value="">Keep current status</option>
+                      <option value="CONFIRMED">Confirmed</option>
+                      <option value="PACKING">Packing</option>
+                      <option value="READY_FOR_PICKUP">Ready for Pickup</option>
+                      <option value="PICKED_UP">Picked Up</option>
+                      <option value="ON_DELIVERY">On Delivery</option>
+                    </select>
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-gray-800 sm:col-span-2 sm:w-fit"
+                    >
+                      Save Dispatch
+                    </button>
+                  </form>
+                </div>
                 <div>
                   <p className="font-semibold">Items</p>
                   <ul className="mt-1 space-y-1">
